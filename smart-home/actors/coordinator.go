@@ -4,6 +4,7 @@ import (
 	"sync"
 
 	af "github.com/LukaKeselj/Agenti/actor-framework"
+	"github.com/LukaKeselj/Agenti/smart-home/model"
 )
 
 // ── CoordinatorActor ───────────────────────────────────────────
@@ -23,7 +24,9 @@ type CoordinatorActor struct {
 	pendingUpdates map[string]ModelUpdatePayload // sensorID → update (for current round)
 
 	globalWeights []float64
-	numFeatures   int
+	numWeights    int
+	numEpochs     int
+	learningRate  float64
 
 	loggerRef af.ActorID
 	deviceRef af.ActorID
@@ -36,15 +39,26 @@ type sensorInfo struct {
 
 // NewCoordinatorActor creates a new coordinator.
 // loggerID and deviceID are the ActorIDs of LoggerActor and DeviceControllerActor.
-func NewCoordinatorActor(id af.ActorID, loggerID, deviceID af.ActorID, numFeatures int) *CoordinatorActor {
+// numWeights is the number of weights in the MLP model (e.g. 75 for 5→8→3).
+func NewCoordinatorActor(id af.ActorID, loggerID, deviceID af.ActorID, numWeights int) *CoordinatorActor {
 	return &CoordinatorActor{
-		BaseActor:      af.NewBaseActor(id),
-		sensors:        make(map[string]sensorInfo),
+		BaseActor:     af.NewBaseActor(id),
+		sensors:       make(map[string]sensorInfo),
 		pendingUpdates: make(map[string]ModelUpdatePayload),
-		loggerRef:      loggerID,
-		deviceRef:      deviceID,
-		numFeatures:    numFeatures,
+		loggerRef:     loggerID,
+		deviceRef:     deviceID,
+		numWeights:    numWeights,
+		numEpochs:     5,
+		learningRate:  0.01,
 	}
+}
+
+// SetTrainingConfig overrides the default epochs and learning rate used in FL rounds.
+func (c *CoordinatorActor) SetTrainingConfig(epochs int, lr float64) {
+	c.mu.Lock()
+	c.numEpochs = epochs
+	c.learningRate = lr
+	c.mu.Unlock()
 }
 
 func (c *CoordinatorActor) Receive(ctx af.ActorContext, msg af.Message) {
@@ -69,7 +83,7 @@ func (c *CoordinatorActor) handleRegisterSensor(msg af.Message) {
 	c.sensors[p.SensorID] = sensorInfo{RoomID: p.RoomID, NumSamples: p.NumSamples}
 	// Initialise global weights on first registration.
 	if c.globalWeights == nil {
-		c.globalWeights = make([]float64, c.numFeatures)
+		c.globalWeights = make([]float64, c.numWeights)
 		for i := range c.globalWeights {
 			c.globalWeights[i] = 0.01
 		}
@@ -99,6 +113,11 @@ func (c *CoordinatorActor) handleStartRound(ctx af.ActorContext) {
 
 	ctx.Log().Info("starting round", "round", round, "sensors", len(sensorIDs))
 
+	c.mu.Lock()
+	epochs := c.numEpochs
+	lr := c.learningRate
+	c.mu.Unlock()
+
 	for _, id := range sensorIDs {
 		ref, err := ctx.System().Lookup(af.ActorID(id))
 		if err != nil {
@@ -110,8 +129,8 @@ func (c *CoordinatorActor) handleStartRound(ctx af.ActorContext) {
 			Payload: StartTrainingPayload{
 				RoundID:      round,
 				Weights:      weights,
-				LearningRate: 0.01,
-				Epochs:       5,
+				LearningRate: lr,
+				Epochs:       epochs,
 			},
 			Sender: ctx.Self().ID(),
 		})
@@ -155,7 +174,6 @@ func (c *CoordinatorActor) aggregateAndFinalise(ctx af.ActorContext) {
 	for _, u := range c.pendingUpdates {
 		updates = append(updates, u)
 	}
-	// FedAvg: weighted average by num_samples.
 	totalSamples := 0
 	for _, u := range updates {
 		totalSamples += u.NumSamples
@@ -165,13 +183,17 @@ func (c *CoordinatorActor) aggregateAndFinalise(ctx af.ActorContext) {
 		return
 	}
 
-	aggregated := make([]float64, len(c.globalWeights))
+	clientWeights := make([][]float64, len(updates))
+	numSamples := make([]int, len(updates))
+	for i, u := range updates {
+		clientWeights[i] = u.Weights
+		numSamples[i] = u.NumSamples
+	}
+
+	aggregated := model.FedAvg(clientWeights, numSamples)
 	avgLoss := 0.0
 	for _, u := range updates {
 		ratio := float64(u.NumSamples) / float64(totalSamples)
-		for i := range aggregated {
-			aggregated[i] += u.Weights[i] * ratio
-		}
 		avgLoss += u.Loss * ratio
 	}
 	c.globalWeights = aggregated
@@ -212,11 +234,17 @@ func (c *CoordinatorActor) aggregateAndFinalise(ctx af.ActorContext) {
 	// Send AdjustEnvironment based on predictions (stub).
 	if c.deviceRef != "" {
 		if devRef, err := ctx.System().Lookup(c.deviceRef); err == nil {
+			temp := 22.0 + aggregated[0]*0.1
+			if temp < 18.0 {
+				temp = 18.0
+			} else if temp > 28.0 {
+				temp = 28.0
+			}
 			devRef.Tell(af.Message{
 				MsgType: MsgAdjustEnvironment,
 				Payload: AdjustEnvironmentPayload{
 					RoomID:      "all",
-					TargetTemp:  22.0 + aggregated[0],
+					TargetTemp:  temp,
 					TargetHum:   50.0,
 					TargetLight: 300.0,
 				},
@@ -239,6 +267,13 @@ func (c *CoordinatorActor) SensorCount() int {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	return len(c.sensors)
+}
+
+// Weights returns a copy of the current global weights.
+func (c *CoordinatorActor) Weights() []float64 {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return copyWeights(c.globalWeights)
 }
 
 // StartRound triggers a new FL round (can be called from outside).

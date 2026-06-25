@@ -1,7 +1,6 @@
 package data
 
 import (
-	"math"
 	"math/rand"
 )
 
@@ -83,16 +82,16 @@ func GenerateSamples(roomID string, numSamples int, skew float64, nonIID bool) [
 
 		samples[i] = Sample{
 			Features: []float64{
-				math.Round(temp*10) / 10,
-				math.Round(hum*10) / 10,
-				math.Round(light),
-				presence,
-				math.Round(hour*10) / 10,
+				(temp - 15) / 20,          // temp → [0,1]
+				(hum - 20) / 60,           // humidity → [0,1]
+				(light - 50) / 950,        // light → [0,1]
+				presence,                  // already [0,1]
+				hour / 23,                 // hour → [0,1]
 			},
 			Target: []float64{
-				math.Round(targetTemp*10) / 10,
-				math.Round(targetHum*10) / 10,
-				math.Round(targetLight),
+				(targetTemp - 18) / 10,    // targetTemp → [0,1]
+				(targetHum - 30) / 40,     // targetHum → [0,1]
+				(targetLight - 50) / 300,  // targetLight → [0,1]
 			},
 			RoomID: roomID,
 		}

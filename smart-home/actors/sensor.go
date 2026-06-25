@@ -1,17 +1,20 @@
 package actors
 
 import (
+	"math"
 	"sync"
 	"time"
 
 	af "github.com/LukaKeselj/Agenti/actor-framework"
+	"github.com/LukaKeselj/Agenti/smart-home/data"
+	"github.com/LukaKeselj/Agenti/smart-home/model"
 )
 
 // ── SensorActor ────────────────────────────────────────────────
 
 // SensorActor simulates an IoT sensor in a room.  It participates
-// in federated learning rounds and uses Become/Unbecome to switch
-// between states: Idle → Training → SendingResults.
+// in federated learning rounds. When trainData is provided, it uses
+// a real MLP model; otherwise it falls back to stub training (tests).
 type SensorActor struct {
 	af.BaseActor
 
@@ -23,17 +26,25 @@ type SensorActor struct {
 	weights  []float64
 	samples  int
 
+	mlp        *model.MLP
+	trainData  []data.Sample
 	coordinator af.ActorID
 }
 
 // NewSensorActor creates a sensor for the given room.
-func NewSensorActor(id af.ActorID, roomID string, coordinator af.ActorID) *SensorActor {
-	return &SensorActor{
+// Pass trainData to enable real MLP training (nil = stub).
+func NewSensorActor(id af.ActorID, roomID string, coordinator af.ActorID, trainData ...[]data.Sample) *SensorActor {
+	s := &SensorActor{
 		BaseActor:   af.NewBaseActor(id),
 		state:       "idle",
 		roomID:      roomID,
 		coordinator: coordinator,
 	}
+	if len(trainData) > 0 && len(trainData[0]) > 0 {
+		s.trainData = trainData[0]
+		s.mlp = model.NewMLP(5, 8, 3)
+	}
+	return s
 }
 
 func (s *SensorActor) Receive(ctx af.ActorContext, msg af.Message) {
@@ -69,19 +80,60 @@ func (s *SensorActor) handleStartTraining(ctx af.ActorContext, msg af.Message) {
 
 	s.systemLog(ctx, "training started", "round", p.RoundID)
 
-	// Simulate training in background (Phase 5 will replace with real MLP).
 	go s.simulateTraining(ctx.Self(), p)
 }
 
 func (s *SensorActor) simulateTraining(self af.ActorRef, p StartTrainingPayload) {
-	// Simulate compute time.
+	if s.mlp != nil && len(s.trainData) > 0 {
+		s.realTraining(self, p)
+	} else {
+		s.stubTraining(self, p)
+	}
+}
+
+func (s *SensorActor) realTraining(self af.ActorRef, p StartTrainingPayload) {
+	s.mlp.SetWeights(p.Weights)
+
+	for epoch := 0; epoch < p.Epochs; epoch++ {
+		for _, sample := range s.trainData {
+			s.mlp.Train(sample.Features, sample.Target, p.LearningRate)
+		}
+	}
+
+	loss := computeLoss(s.mlp, s.trainData)
+	trained := s.mlp.Weights()
+	numSamples := len(s.trainData)
+
+	self.Tell(af.Message{
+		MsgType: MsgTrainingComplete,
+		Payload: TrainingCompletePayload{
+			Weights:    trained,
+			Loss:       loss,
+			NumSamples: numSamples,
+		},
+	})
+}
+
+func computeLoss(mlp *model.MLP, samples []data.Sample) float64 {
+	var total float64
+	for _, s := range samples {
+		pred := mlp.Predict(s.Features)
+		for j := range pred {
+			diff := pred[j] - s.Target[j]
+			total += diff * diff
+		}
+	}
+	return math.Round(total/float64(len(samples)*3)*1e6) / 1e6
+}
+
+func (s *SensorActor) stubTraining(self af.ActorRef, p StartTrainingPayload) {
 	delay := time.Duration(50+p.Epochs*10) * time.Millisecond
 	time.Sleep(delay)
 
 	numSamples := 80 + (int(time.Now().UnixNano()) % 40)
 	trained := copyWeights(p.Weights)
 	for i := range trained {
-		trained[i] += 0.01 * float64(i%3-1) // tiny random perturbation
+		trained[i] += 0.01 * float64(i%3-1)
 	}
 
 	self.Tell(af.Message{

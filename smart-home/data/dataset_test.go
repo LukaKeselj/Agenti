@@ -32,20 +32,20 @@ func TestGenerateSamples_FeatureRanges(t *testing.T) {
 	samples := data.GenerateSamples("test", 500, 0.5, false)
 	for _, s := range samples {
 		f := s.Features
-		if f[0] < 15 || f[0] > 35 {
-			t.Errorf("temp %.1f out of range [15, 35]", f[0])
+		if f[0] < 0 || f[0] > 1 {
+			t.Errorf("temp %.3f out of range [0, 1]", f[0])
 		}
-		if f[1] < 20 || f[1] > 80 {
-			t.Errorf("hum %.1f out of range [20, 80]", f[1])
+		if f[1] < 0 || f[1] > 1 {
+			t.Errorf("hum %.3f out of range [0, 1]", f[1])
 		}
-		if f[2] < 50 || f[2] > 1000 {
-			t.Errorf("light %.0f out of range [50, 1000]", f[2])
+		if f[2] < 0 || f[2] > 1 {
+			t.Errorf("light %.3f out of range [0, 1]", f[2])
 		}
 		if f[3] != 0 && f[3] != 1 {
 			t.Errorf("presence %.0f must be 0 or 1", f[3])
 		}
-		if f[4] < 0 || f[4] > 23 {
-			t.Errorf("hour %.1f out of range [0, 23]", f[4])
+		if f[4] < 0 || f[4] > 1 {
+			t.Errorf("hour %.3f out of range [0, 1]", f[4])
 		}
 	}
 }

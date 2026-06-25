@@ -41,7 +41,7 @@ func TestSensorActor_StartTrainingTransitions(t *testing.T) {
 
 	// Spawn a coordinator so the sensor can find it,
 	// even though we won't trigger a full round.
-	mustSpawn(t, sys, actors.NewCoordinatorActor("coordinator", "", "", 4))
+	mustSpawn(t, sys, actors.NewCoordinatorActor("coordinator", "", "", 75))
 
 	sensor := actors.NewSensorActor("sensor-living", "livingroom", "coordinator")
 	sensorRef := mustSpawn(t, sys, sensor)
@@ -72,7 +72,7 @@ func TestCoordinator_FullRound(t *testing.T) {
 	logger := actors.NewLoggerActor("logger")
 	mustSpawn(t, sys, logger)
 
-	coord := actors.NewCoordinatorActor("coordinator", "logger", "", 4)
+	coord := actors.NewCoordinatorActor("coordinator", "logger", "", 75)
 	coordRef := mustSpawn(t, sys, coord)
 	time.Sleep(50 * time.Millisecond)
 
@@ -124,7 +124,7 @@ func TestCoordinator_MultipleRounds(t *testing.T) {
 	logger := actors.NewLoggerActor("logger")
 	mustSpawn(t, sys, logger)
 
-	coord := actors.NewCoordinatorActor("coordinator", "logger", "", 4)
+	coord := actors.NewCoordinatorActor("coordinator", "logger", "", 75)
 	coordRef := mustSpawn(t, sys, coord)
 	time.Sleep(50 * time.Millisecond)
 
@@ -247,7 +247,7 @@ func TestSmartHome_FullFlow(t *testing.T) {
 	mustSpawn(t, sys, devCtrl)
 
 	// 3. Coordinator (with logger and device refs)
-	coord := actors.NewCoordinatorActor("coordinator", "logger", "device-ctrl", 5)
+	coord := actors.NewCoordinatorActor("coordinator", "logger", "device-ctrl", 75)
 	coordRef := mustSpawn(t, sys, coord)
 	time.Sleep(50 * time.Millisecond)
 

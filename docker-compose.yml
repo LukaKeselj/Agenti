@@ -1,0 +1,11 @@
+services:
+  demo:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: pametna-kuca-demo
+    volumes:
+      - demo-data:/app/demo-data
+
+volumes:
+  demo-data:
