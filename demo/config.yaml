@@ -1,0 +1,26 @@
+demo:
+  num_rounds: 10
+  persistence_dir: "./demo-data"
+  heartbeat_interval_sec: 5
+
+training:
+  epochs: 1
+  learning_rate: 0.01
+
+sensors:
+  rooms:
+    - kitchen
+    - livingroom
+    - bedroom
+    - bathroom
+    - garage
+  samples_per_sensor: 800
+  non_iid: true
+
+supervision:
+  strategy: "one_for_one"
+  max_retries: 3
+  within_sec: 30
+
+validation:
+  samples: 100
