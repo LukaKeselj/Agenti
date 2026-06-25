@@ -4,6 +4,7 @@ import (
 	"sync"
 
 	af "github.com/LukaKeselj/Agenti/actor-framework"
+	"github.com/LukaKeselj/Agenti/smart-home/persistence"
 )
 
 // ── DeviceControllerActor ──────────────────────────────────────
@@ -14,8 +15,45 @@ import (
 type DeviceControllerActor struct {
 	af.BaseActor
 
-	mu      sync.Mutex
-	devices map[string]map[string]float64 // roomID → device → value
+	mu        sync.Mutex
+	devices   map[string]map[string]float64 // roomID → device → value
+	persister *persistence.Persister
+}
+
+type deviceSavedState struct {
+	Devices map[string]map[string]float64 `json:"devices"`
+}
+
+func (d *DeviceControllerActor) SetPersister(p *persistence.Persister) {
+	d.persister = p
+}
+
+func (d *DeviceControllerActor) OnPreStart(ctx af.ActorContext) error {
+	if d.persister == nil {
+		return nil
+	}
+	var state deviceSavedState
+	if err := d.persister.Load(string(d.ID()), &state); err != nil {
+		return nil
+	}
+	d.mu.Lock()
+	d.devices = state.Devices
+	if d.devices == nil {
+		d.devices = make(map[string]map[string]float64)
+	}
+	d.mu.Unlock()
+	ctx.Log().Info("restored device controller state", "rooms", len(state.Devices))
+	return nil
+}
+
+func (d *DeviceControllerActor) persistState() {
+	if d.persister == nil {
+		return
+	}
+	d.mu.Lock()
+	state := deviceSavedState{Devices: d.devices}
+	d.mu.Unlock()
+	_ = d.persister.Save(string(d.ID()), state)
 }
 
 // NewDeviceControllerActor creates a new device controller.
@@ -71,6 +109,8 @@ func (d *DeviceControllerActor) handleAdjustEnvironment(ctx af.ActorContext, msg
 			})
 		}
 	}
+
+	d.persistState()
 }
 
 // GetDeviceValue returns the current value of a device in a room.

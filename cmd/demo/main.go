@@ -34,11 +34,13 @@ func main() {
 
 	// Logger.
 	logger := actors.NewLoggerActor("logger")
+	logger.SetPersister(pers)
 	sys.MustSpawn(logger, opts)
 	fmt.Println("Logger actor spawned")
 
 	// Device controller.
 	devCtrl := actors.NewDeviceControllerActor("device-ctrl")
+	devCtrl.SetPersister(pers)
 	sys.MustSpawn(devCtrl, opts)
 	fmt.Println("Device controller spawned")
 
@@ -53,6 +55,7 @@ func main() {
 	// Coordinator.
 	coord := actors.NewCoordinatorActor("coordinator", "logger", "device-ctrl", 5*8+8+8*3+3)
 	coord.SetTrainingConfig(1, 0.01)
+	coord.SetPersister(pers)
 	coordRef := sys.MustSpawn(coord, opts)
 	fmt.Println("Coordinator spawned")
 
@@ -69,6 +72,7 @@ func main() {
 		time.Sleep(50 * time.Millisecond)
 
 		sensor := actors.NewSensorActor(af.ActorID(sensorID), room, "coordinator", datasets[room])
+		sensor.SetPersister(pers)
 		_ = sys.MustSpawn(sensor, af.SpawnOptions{
 			SupervisorID: "supervisor",
 		})

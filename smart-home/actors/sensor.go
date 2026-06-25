@@ -8,6 +8,7 @@ import (
 	af "github.com/LukaKeselj/Agenti/actor-framework"
 	"github.com/LukaKeselj/Agenti/smart-home/data"
 	"github.com/LukaKeselj/Agenti/smart-home/model"
+	"github.com/LukaKeselj/Agenti/smart-home/persistence"
 )
 
 // ── SensorActor ────────────────────────────────────────────────
@@ -26,9 +27,51 @@ type SensorActor struct {
 	weights  []float64
 	samples  int
 
-	mlp        *model.MLP
-	trainData  []data.Sample
-	coordinator af.ActorID
+	mlp         *model.MLP
+	trainData   []data.Sample
+	coordinator  af.ActorID
+	persister   *persistence.Persister
+}
+
+type sensorSavedState struct {
+	Weights  []float64 `json:"weights"`
+	RoundID  int       `json:"round_id"`
+	Samples  int       `json:"samples"`
+}
+
+func (s *SensorActor) SetPersister(p *persistence.Persister) {
+	s.persister = p
+}
+
+func (s *SensorActor) OnPreStart(ctx af.ActorContext) error {
+	if s.persister == nil {
+		return nil
+	}
+	var state sensorSavedState
+	if err := s.persister.Load(string(s.ID()), &state); err != nil {
+		return nil
+	}
+	s.mu.Lock()
+	s.weights = state.Weights
+	s.roundID = state.RoundID
+	s.samples = state.Samples
+	s.mu.Unlock()
+	ctx.Log().Info("restored sensor state", "round", state.RoundID, "samples", state.Samples)
+	return nil
+}
+
+func (s *SensorActor) persistState() {
+	if s.persister == nil {
+		return
+	}
+	s.mu.Lock()
+	state := sensorSavedState{
+		Weights: s.weights,
+		RoundID: s.roundID,
+		Samples: s.samples,
+	}
+	s.mu.Unlock()
+	_ = s.persister.Save(string(s.ID()), state)
 }
 
 // NewSensorActor creates a sensor for the given room.
@@ -186,6 +229,8 @@ func (s *SensorActor) handleTrainingComplete(ctx af.ActorContext, msg af.Message
 	s.mu.Lock()
 	s.state = "idle"
 	s.mu.Unlock()
+
+	s.persistState()
 }
 
 // ── Global model update ────────────────────────────────────────

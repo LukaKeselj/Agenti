@@ -5,6 +5,7 @@ import (
 
 	af "github.com/LukaKeselj/Agenti/actor-framework"
 	"github.com/LukaKeselj/Agenti/smart-home/model"
+	"github.com/LukaKeselj/Agenti/smart-home/persistence"
 )
 
 // ── CoordinatorActor ───────────────────────────────────────────
@@ -30,11 +31,24 @@ type CoordinatorActor struct {
 
 	loggerRef af.ActorID
 	deviceRef af.ActorID
+	persister *persistence.Persister
 }
 
 type sensorInfo struct {
 	RoomID     string
 	NumSamples int
+}
+
+type sensorInfoData struct {
+	SensorID   string `json:"sensor_id"`
+	RoomID     string `json:"room_id"`
+	NumSamples int    `json:"num_samples"`
+}
+
+type coordinatorSavedState struct {
+	Round         int               `json:"round"`
+	GlobalWeights []float64         `json:"global_weights"`
+	Sensors       []sensorInfoData  `json:"sensors"`
 }
 
 // NewCoordinatorActor creates a new coordinator.
@@ -51,6 +65,53 @@ func NewCoordinatorActor(id af.ActorID, loggerID, deviceID af.ActorID, numWeight
 		numEpochs:     5,
 		learningRate:  0.01,
 	}
+}
+
+// SetPersister attaches a persister for state restoration and saving.
+func (c *CoordinatorActor) SetPersister(p *persistence.Persister) {
+	c.persister = p
+}
+
+func (c *CoordinatorActor) OnPreStart(ctx af.ActorContext) error {
+	if c.persister == nil {
+		return nil
+	}
+	var state coordinatorSavedState
+	if err := c.persister.Load(string(c.ID()), &state); err != nil {
+		return nil
+	}
+	c.mu.Lock()
+	c.round = state.Round
+	if state.GlobalWeights != nil {
+		c.globalWeights = state.GlobalWeights
+	}
+	c.sensors = make(map[string]sensorInfo, len(state.Sensors))
+	for _, s := range state.Sensors {
+		c.sensors[s.SensorID] = sensorInfo{RoomID: s.RoomID, NumSamples: s.NumSamples}
+	}
+	c.mu.Unlock()
+	ctx.Log().Info("restored coordinator state", "round", state.Round, "sensors", len(state.Sensors))
+	return nil
+}
+
+func (c *CoordinatorActor) persistState() {
+	if c.persister == nil {
+		return
+	}
+	c.mu.Lock()
+	state := coordinatorSavedState{
+		Round:         c.round,
+		GlobalWeights: c.globalWeights,
+	}
+	for id, info := range c.sensors {
+		state.Sensors = append(state.Sensors, sensorInfoData{
+			SensorID:   id,
+			RoomID:     info.RoomID,
+			NumSamples: info.NumSamples,
+		})
+	}
+	c.mu.Unlock()
+	_ = c.persister.Save(string(c.ID()), state)
 }
 
 // SetTrainingConfig overrides the default epochs and learning rate used in FL rounds.
@@ -253,6 +314,8 @@ func (c *CoordinatorActor) aggregateAndFinalise(ctx af.ActorContext) {
 	}
 
 	ctx.Log().Info("round complete", "round", round, "clients", len(updates), "avg_loss", avgLoss)
+
+	c.persistState()
 }
 
 // ── helpers ────────────────────────────────────────────────────
