@@ -7,6 +7,7 @@ import (
 
 	af "github.com/LukaKeselj/Agenti/actor-framework"
 	"github.com/LukaKeselj/Agenti/actor-framework/supervision"
+	"github.com/stretchr/testify/require"
 )
 
 // ── test helpers ───────────────────────────────────────────────
@@ -51,9 +52,7 @@ func (a *crashActor) Receive(_ af.ActorContext, msg af.Message) {
 func TestStrategy_OneForOne_Restart(t *testing.T) {
 	strat := &supervision.OneForOne{MaxRetries: 3, Within: 10 * time.Second}
 	d := strat.OnFailure("a1", []time.Time{time.Now()})
-	if d.Action != supervision.ActionRestart {
-		t.Fatalf("expected Restart, got %v", d.Action)
-	}
+	require.Equal(t, supervision.ActionRestart, d.Action)
 }
 
 func TestStrategy_OneForOne_Escalate(t *testing.T) {
@@ -64,9 +63,7 @@ func TestStrategy_OneForOne_Escalate(t *testing.T) {
 	}
 	strat := &supervision.OneForOne{MaxRetries: 3, Within: 10 * time.Second}
 	d := strat.OnFailure("a1", failures)
-	if d.Action != supervision.ActionEscalate {
-		t.Fatalf("expected Escalate, got %v", d.Action)
-	}
+	require.Equal(t, supervision.ActionEscalate, d.Action)
 }
 
 func TestStrategy_ExponentialBackoff_Delays(t *testing.T) {
@@ -75,29 +72,21 @@ func TestStrategy_ExponentialBackoff_Delays(t *testing.T) {
 		MaxDelay:     30 * time.Second,
 		Factor:       2.0,
 	}
-	// First failure → 1s delay.
 	d1 := strat.OnFailure("a1", []time.Time{time.Now()})
-	if d1.Action != supervision.ActionRestart || d1.Delay != time.Second {
-		t.Fatalf("expected 1s delay, got %v", d1.Delay)
-	}
-	// Second failure → 2s delay.
+	require.Equal(t, supervision.ActionRestart, d1.Action)
+	require.Equal(t, time.Second, d1.Delay)
+
 	d2 := strat.OnFailure("a1", []time.Time{time.Now(), time.Now()})
-	if d2.Delay != 2*time.Second {
-		t.Fatalf("expected 2s delay, got %v", d2.Delay)
-	}
-	// 6th failure should be capped at max 30s.
+	require.Equal(t, 2*time.Second, d2.Delay)
+
 	d6 := strat.OnFailure("a1", make([]time.Time, 6))
-	if d6.Delay != 30*time.Second {
-		t.Fatalf("expected 30s cap, got %v", d6.Delay)
-	}
+	require.Equal(t, 30*time.Second, d6.Delay)
 }
 
 func TestStrategy_Escalation(t *testing.T) {
 	strat := &supervision.Escalation{}
 	d := strat.OnFailure("a1", []time.Time{time.Now()})
-	if d.Action != supervision.ActionEscalate {
-		t.Fatalf("expected Escalate, got %v", d.Action)
-	}
+	require.Equal(t, supervision.ActionEscalate, d.Action)
 }
 
 // ── supervisor integration tests ───────────────────────────────
@@ -106,18 +95,14 @@ func TestSupervisor_RestartOnFailure(t *testing.T) {
 	sys := af.NewActorSystem("test-supervisor")
 	defer sys.Shutdown()
 
-	// Spawn the supervisor.
 	supRef, err := sys.Spawn(
 		supervision.NewSupervisorActor("sup", supervision.SupervisionConfig{
 			Strategy: &supervision.OneForOne{MaxRetries: 3, Within: 10 * time.Second},
 		}),
 		af.DefaultSpawnOptions(),
 	)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
-	// Register a factory for the crash actor.
 	supervision.Register(supRef, "crasher", func() af.Actor {
 		return newCrashActor("crasher")
 	}, af.SpawnOptions{
@@ -125,26 +110,17 @@ func TestSupervisor_RestartOnFailure(t *testing.T) {
 	})
 	time.Sleep(50 * time.Millisecond)
 
-	// Spawn the actual crash actor (supervised by sup).
 	crasherRef, err := sys.Spawn(newCrashActor("crasher"), af.SpawnOptions{
 		SupervisorID: "sup",
 	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	_ = crasherRef
+	require.NoError(t, err)
 	time.Sleep(50 * time.Millisecond)
 
-	// Trigger a crash.
 	crasherRef.Tell(af.Message{MsgType: "crash"})
 	time.Sleep(500 * time.Millisecond)
 
-	// After the crash and restart, the actor should be available again.
 	newRef, err := sys.Lookup("crasher")
-	if err != nil {
-		t.Fatalf("actor should have been restarted: %v", err)
-	}
-	// The new ref should be functional.
+	require.NoError(t, err)
 	newRef.Tell(af.Message{MsgType: "ping"})
 }
 
@@ -160,7 +136,6 @@ func TestSupervisor_RegisterAndUnregister(t *testing.T) {
 	)
 	time.Sleep(50 * time.Millisecond)
 
-	// Register then unregister an actor.
 	supervision.Register(supRef, "temp", func() af.Actor {
 		return newCountActor("temp", nil)
 	}, af.DefaultSpawnOptions())
@@ -168,7 +143,6 @@ func TestSupervisor_RegisterAndUnregister(t *testing.T) {
 
 	supervision.Unregister(supRef, "temp")
 	time.Sleep(50 * time.Millisecond)
-	// Should not panic or error.
 }
 
 func TestSupervisor_UnknownActorFailure(t *testing.T) {
@@ -207,9 +181,7 @@ func TestSupervisor_ExponentialBackoff(t *testing.T) {
 		}),
 		af.DefaultSpawnOptions(),
 	)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	supervision.Register(supRef, "backoff-actor", func() af.Actor {
 		return newCrashActor("backoff-actor")
@@ -219,15 +191,11 @@ func TestSupervisor_ExponentialBackoff(t *testing.T) {
 	ref, _ := sys.Spawn(newCrashActor("backoff-actor"), af.SpawnOptions{SupervisorID: "sup4"})
 	time.Sleep(50 * time.Millisecond)
 
-	// Crash twice.
 	ref.Tell(af.Message{MsgType: "crash"})
 	time.Sleep(300 * time.Millisecond)
 
-	// After first restart, the actor should be back.
 	_, err = sys.Lookup("backoff-actor")
-	if err != nil {
-		t.Fatalf("actor should have been restarted: %v", err)
-	}
+	require.NoError(t, err)
 }
 
 func TestSupervisor_AskAfterRestart(t *testing.T) {
@@ -249,16 +217,11 @@ func TestSupervisor_AskAfterRestart(t *testing.T) {
 	ref, _ := sys.Spawn(newEchoActor("echo"), af.SpawnOptions{SupervisorID: "sup5"})
 	time.Sleep(50 * time.Millisecond)
 
-	// Ask should work.
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
 	reply, err := ref.Ask(ctx, af.Message{MsgType: "ping", Payload: "hello"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if reply.Payload != "hello" {
-		t.Fatalf("expected 'hello', got %v", reply.Payload)
-	}
+	require.NoError(t, err)
+	require.Equal(t, "hello", reply.Payload)
 }
 
 // echoActor used by Ask test.

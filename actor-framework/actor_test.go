@@ -7,6 +7,8 @@ import (
 	"time"
 
 	af "github.com/LukaKeselj/Agenti/actor-framework"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // ─────────────────────────────────────────────
@@ -109,15 +111,11 @@ func TestMailbox_BoundedDropNewest(t *testing.T) {
 
 	mb.Enqueue(af.Message{MsgType: "a"})
 	mb.Enqueue(af.Message{MsgType: "b"})
-	mb.Enqueue(af.Message{MsgType: "c"}) // should be dropped
+	mb.Enqueue(af.Message{MsgType: "c"})
 
 	stats := mb.Stats()
-	if stats.Dropped != 1 {
-		t.Fatalf("expected 1 dropped, got %d", stats.Dropped)
-	}
-	if stats.Pending != 2 {
-		t.Fatalf("expected 2 pending, got %d", stats.Pending)
-	}
+	require.EqualValues(t, 1, stats.Dropped)
+	require.EqualValues(t, 2, stats.Pending)
 }
 
 func TestMailbox_Unbounded(t *testing.T) {
@@ -134,7 +132,7 @@ func TestMailbox_Unbounded(t *testing.T) {
 		case <-mb.C():
 			received++
 		case <-timeout:
-			t.Fatalf("timeout: only received %d/%d messages", received, n)
+			require.Failf(t, "timeout", "only received %d/%d messages", received, n)
 		}
 	}
 }
@@ -149,9 +147,7 @@ func TestSystem_SpawnAndTell(t *testing.T) {
 
 	actor := newCountActor("counter", 3)
 	ref, err := sys.Spawn(actor, af.DefaultSpawnOptions())
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	for i := 0; i < 3; i++ {
 		ref.Tell(af.Message{MsgType: "ping"})
@@ -160,12 +156,10 @@ func TestSystem_SpawnAndTell(t *testing.T) {
 	select {
 	case <-actor.done:
 	case <-time.After(2 * time.Second):
-		t.Fatalf("timed out; got %d messages", actor.Count())
+		require.Failf(t, "timeout", "got %d messages", actor.Count())
 	}
 
-	if actor.Count() != 3 {
-		t.Fatalf("expected 3, got %d", actor.Count())
-	}
+	require.Equal(t, 3, actor.Count())
 }
 
 func TestSystem_DuplicateSpawnFails(t *testing.T) {
@@ -174,13 +168,10 @@ func TestSystem_DuplicateSpawnFails(t *testing.T) {
 
 	opts := af.DefaultSpawnOptions()
 	_, err := sys.Spawn(newEchoActor("echo"), opts)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
+
 	_, err = sys.Spawn(newEchoActor("echo"), opts)
-	if err == nil {
-		t.Fatal("expected error on duplicate spawn, got nil")
-	}
+	require.Error(t, err)
 }
 
 // ─────────────────────────────────────────────
@@ -197,28 +188,21 @@ func TestSystem_Ask(t *testing.T) {
 	defer cancel()
 
 	reply, err := ref.Ask(ctx, af.Message{MsgType: "hello", Payload: "world"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if reply.Payload != "world" {
-		t.Fatalf("expected 'world', got %v", reply.Payload)
-	}
+	require.NoError(t, err)
+	require.Equal(t, "world", reply.Payload)
 }
 
 func TestSystem_AskTimeout(t *testing.T) {
 	sys := af.NewActorSystem("test")
 	defer sys.Shutdown()
 
-	// A counter actor never replies to Ask, so Ask must time out.
 	ref, _ := sys.Spawn(newCountActor("sink", 999), af.DefaultSpawnOptions())
 
 	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
 	defer cancel()
 
 	_, err := ref.Ask(ctx, af.Message{MsgType: "req"})
-	if err == nil {
-		t.Fatal("expected timeout error, got nil")
-	}
+	require.Error(t, err)
 }
 
 // ─────────────────────────────────────────────
@@ -236,7 +220,6 @@ func TestContext_BecomeUnbecome(t *testing.T) {
 	ref.Tell(af.Message{MsgType: "switch"})
 	ref.Tell(af.Message{MsgType: "after"})
 
-	// Give the actor time to process.
 	time.Sleep(100 * time.Millisecond)
 
 	actor.mu.Lock()
@@ -244,13 +227,9 @@ func TestContext_BecomeUnbecome(t *testing.T) {
 	actor.mu.Unlock()
 
 	want := []string{"default:before", "default:switch", "alt:after"}
-	if len(got) != len(want) {
-		t.Fatalf("expected %v, got %v", want, got)
-	}
+	require.Len(t, got, len(want))
 	for i, v := range want {
-		if got[i] != v {
-			t.Errorf("index %d: expected %q, got %q", i, v, got[i])
-		}
+		assert.Equal(t, v, got[i], "index %d", i)
 	}
 }
 
@@ -264,12 +243,11 @@ func TestSystem_Lookup(t *testing.T) {
 
 	sys.Spawn(newEchoActor("alpha"), af.DefaultSpawnOptions())
 
-	if _, err := sys.Lookup("alpha"); err != nil {
-		t.Fatalf("lookup failed: %v", err)
-	}
-	if _, err := sys.Lookup("ghost"); err == nil {
-		t.Fatal("expected error for unknown actor")
-	}
+	_, err := sys.Lookup("alpha")
+	require.NoError(t, err)
+
+	_, err = sys.Lookup("ghost")
+	require.Error(t, err)
 }
 
 // ─────────────────────────────────────────────
@@ -282,13 +260,13 @@ func TestSystem_Shutdown(t *testing.T) {
 		id := af.ActorID(string(rune('a' + i)))
 		sys.Spawn(newCountActor(id, 0), af.DefaultSpawnOptions())
 	}
-	// Shutdown must return within a reasonable timeout.
+
 	done := make(chan struct{})
 	go func() { sys.Shutdown(); close(done) }()
 
 	select {
 	case <-done:
 	case <-time.After(3 * time.Second):
-		t.Fatal("Shutdown did not complete in time")
+		require.Fail(t, "Shutdown did not complete in time")
 	}
 }

@@ -8,6 +8,7 @@ import (
 
 	af "github.com/LukaKeselj/Agenti/actor-framework"
 	"github.com/LukaKeselj/Agenti/actor-framework/remote"
+	"github.com/stretchr/testify/require"
 )
 
 // ── test actors ────────────────────────────────────────────────
@@ -72,9 +73,7 @@ func (a *countActor) Count() int {
 func startTestServer(t *testing.T, sys *af.ActorSystem) string {
 	t.Helper()
 	srv := remote.NewActorServer(sys)
-	if err := srv.Start("127.0.0.1:0"); err != nil {
-		t.Fatalf("failed to start gRPC server: %v", err)
-	}
+	require.NoError(t, srv.Start("127.0.0.1:0"))
 	t.Cleanup(srv.Shutdown)
 	return srv.Addr()
 }
@@ -97,12 +96,10 @@ func TestRemote_Tell(t *testing.T) {
 	select {
 	case <-actor.done:
 	case <-time.After(3 * time.Second):
-		t.Fatalf("timed out; got %d messages", actor.Count())
+		require.Failf(t, "timeout", "got %d messages", actor.Count())
 	}
 
-	if actor.Count() != 3 {
-		t.Fatalf("expected 3, got %d", actor.Count())
-	}
+	require.Equal(t, 3, actor.Count())
 }
 
 func TestRemote_Ask(t *testing.T) {
@@ -118,12 +115,8 @@ func TestRemote_Ask(t *testing.T) {
 	defer cancel()
 
 	reply, err := ref.Ask(ctx, af.Message{MsgType: "hello", Payload: "world"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if reply.Payload != "world" {
-		t.Fatalf("expected 'world', got %v", reply.Payload)
-	}
+	require.NoError(t, err)
+	require.Equal(t, "world", reply.Payload)
 }
 
 func TestRemote_AskTimeout(t *testing.T) {
@@ -131,7 +124,6 @@ func TestRemote_AskTimeout(t *testing.T) {
 	defer sys.Shutdown()
 
 	addr := startTestServer(t, sys)
-	// countActor never replies to Ask → should timeout
 	sys.MustSpawn(newCountActor("sink", 999), af.DefaultSpawnOptions())
 
 	ref := remote.NewRemoteActorRef("sink", addr)
@@ -140,9 +132,7 @@ func TestRemote_AskTimeout(t *testing.T) {
 	defer cancel()
 
 	_, err := ref.Ask(ctx, af.Message{MsgType: "req"})
-	if err == nil {
-		t.Fatal("expected timeout error, got nil")
-	}
+	require.Error(t, err)
 }
 
 func TestRemote_Stop(t *testing.T) {
@@ -152,24 +142,19 @@ func TestRemote_Stop(t *testing.T) {
 	addr := startTestServer(t, sys)
 	sys.MustSpawn(newEchoActor("stoppable"), af.DefaultSpawnOptions())
 
-	// Verify the actor exists.
-	if _, err := sys.Lookup("stoppable"); err != nil {
-		t.Fatal("actor should exist before Stop")
-	}
+	_, err := sys.Lookup("stoppable")
+	require.NoError(t, err)
 
 	ref := remote.NewRemoteActorRef("stoppable", addr)
 	ref.Stop()
 
 	time.Sleep(200 * time.Millisecond)
 
-	// After Stop, the actor should no longer be registered.
-	if _, err := sys.Lookup("stoppable"); err == nil {
-		t.Fatal("actor should have been removed after Stop")
-	}
+	_, err = sys.Lookup("stoppable")
+	require.Error(t, err)
 }
 
 func TestRemote_TwoSystems(t *testing.T) {
-	// System A hosts an actor; system B talks to it via RemoteActorRef.
 	sysA := af.NewActorSystem("A")
 	defer sysA.Shutdown()
 
@@ -179,26 +164,19 @@ func TestRemote_TwoSystems(t *testing.T) {
 	addrA := startTestServer(t, sysA)
 	sysA.MustSpawn(newEchoActor("alice"), af.DefaultSpawnOptions())
 
-	// From B's perspective, alice is remote.
 	ref := remote.NewRemoteActorRef("alice", addrA)
 
-	// Tell
 	done := make(chan struct{}, 1)
 	actorB := newCountActor("bob", 1)
 	sysB.MustSpawn(actorB, af.DefaultSpawnOptions())
-	_ = actorB // not used in this test, just for illustration
+	_ = actorB
 
-	// Ask – B talks to A's echo actor.
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
 	reply, err := ref.Ask(ctx, af.Message{MsgType: "ping", Payload: "pong"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if reply.Payload != "pong" {
-		t.Fatalf("expected 'pong', got %v", reply.Payload)
-	}
+	require.NoError(t, err)
+	require.Equal(t, "pong", reply.Payload)
 	_ = done
 }
 
@@ -208,20 +186,15 @@ func TestRemote_UnknownActor(t *testing.T) {
 
 	addr := startTestServer(t, sys)
 
-	// Point to a non-existent actor.
 	ref := remote.NewRemoteActorRef("ghost", addr)
 
-	// Tell should not panic.
 	ref.Tell(af.Message{MsgType: "hello"})
 
-	// Ask should return an error.
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
 
 	_, err := ref.Ask(ctx, af.Message{MsgType: "req"})
-	if err == nil {
-		t.Fatal("expected error for unknown actor")
-	}
+	require.Error(t, err)
 }
 
 func TestRemote_StructuredPayload(t *testing.T) {
@@ -243,20 +216,10 @@ func TestRemote_StructuredPayload(t *testing.T) {
 	defer cancel()
 
 	reply, err := ref.Ask(ctx, af.Message{MsgType: "reading", Payload: reading})
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
-	// The reply payload should be decodeable back to the original struct.
-	// Since it goes through JSON, it'll come back as map[string]any.
 	got, ok := reply.Payload.(map[string]any)
-	if !ok {
-		t.Fatalf("expected map[string]any, got %T", reply.Payload)
-	}
-	if got["temp"] != 23.5 {
-		t.Errorf("expected temp 23.5, got %v", got["temp"])
-	}
-	if got["hum"] != 60.0 {
-		t.Errorf("expected hum 60.0, got %v", got["hum"])
-	}
+	require.True(t, ok)
+	require.Equal(t, 23.5, got["temp"])
+	require.Equal(t, 60.0, got["hum"])
 }

@@ -4,40 +4,39 @@ import (
 	"testing"
 
 	"github.com/LukaKeselj/Agenti/smart-home/evaluation"
+	"github.com/stretchr/testify/require"
 )
 
 func TestCalculate_Perfect(t *testing.T) {
 	actual := []float64{1.0, 2.0, 3.0}
 	predicted := []float64{1.0, 2.0, 3.0}
 	m := evaluation.Calculate(actual, predicted)
-	if m.MSE != 0 || m.RMSE != 0 || m.MAE != 0 || m.R2 != 1.0 {
-		t.Fatalf("expected perfect metrics, got %+v", m)
-	}
+	require.Equal(t, 0.0, m.MSE)
+	require.Equal(t, 0.0, m.RMSE)
+	require.Equal(t, 0.0, m.MAE)
+	require.Equal(t, 1.0, m.R2)
 }
 
 func TestCalculate_Constant(t *testing.T) {
 	actual := []float64{1.0, 2.0, 3.0}
 	predicted := []float64{2.0, 2.0, 2.0}
 	m := evaluation.Calculate(actual, predicted)
-	if m.MSE <= 0 || m.RMSE <= 0 || m.MAE <= 0 {
-		t.Fatalf("expected positive errors, got %+v", m)
-	}
+	require.Greater(t, m.MSE, 0.0)
+	require.Greater(t, m.RMSE, 0.0)
+	require.Greater(t, m.MAE, 0.0)
 }
 
 func TestCalculate_R2Bounds(t *testing.T) {
 	actual := []float64{0.0, 1.0, 2.0, 3.0}
 	predicted := []float64{0.0, 1.0, 2.0, 3.0}
 	m := evaluation.Calculate(actual, predicted)
-	if m.R2 != 1.0 {
-		t.Fatalf("expected R²=1.0, got %f", m.R2)
-	}
+	require.Equal(t, 1.0, m.R2)
 }
 
 func TestCalculate_Empty(t *testing.T) {
 	m := evaluation.Calculate(nil, nil)
-	if m.MSE != 0 || m.RMSE != 0 {
-		t.Fatalf("expected zero metrics for empty input, got %+v", m)
-	}
+	require.Equal(t, 0.0, m.MSE)
+	require.Equal(t, 0.0, m.RMSE)
 }
 
 func TestPrintConvergenceTable_NoPanic(t *testing.T) {
@@ -57,8 +56,5 @@ func TestCalculate_OffByOne(t *testing.T) {
 	actual := []float64{10.0, 20.0, 30.0}
 	predicted := []float64{11.0, 21.0, 31.0}
 	m := evaluation.Calculate(actual, predicted)
-	// MSE = ((10-11)^2 + (20-21)^2 + (30-31)^2) / 3 = (1+1+1)/3 = 1
-	if m.MSE != 1.0 {
-		t.Fatalf("expected MSE=1.0, got %f", m.MSE)
-	}
+	require.Equal(t, 1.0, m.MSE)
 }

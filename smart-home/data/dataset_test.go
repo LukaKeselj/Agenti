@@ -4,27 +4,21 @@ import (
 	"testing"
 
 	"github.com/LukaKeselj/Agenti/smart-home/data"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestGenerateSamples_Count(t *testing.T) {
 	samples := data.GenerateSamples("kitchen", 100, 0.5, false)
-	if len(samples) != 100 {
-		t.Fatalf("expected 100 samples, got %d", len(samples))
-	}
+	require.Len(t, samples, 100)
 }
 
 func TestGenerateSamples_FeatureShape(t *testing.T) {
 	samples := data.GenerateSamples("bedroom", 10, 0.0, false)
 	for i, s := range samples {
-		if len(s.Features) != 5 {
-			t.Fatalf("sample %d: expected 5 features, got %d", i, len(s.Features))
-		}
-		if len(s.Target) != 3 {
-			t.Fatalf("sample %d: expected 3 targets, got %d", i, len(s.Target))
-		}
-		if s.RoomID != "bedroom" {
-			t.Fatalf("sample %d: expected room 'bedroom', got %q", i, s.RoomID)
-		}
+		require.Lenf(t, s.Features, 5, "sample %d features", i)
+		require.Lenf(t, s.Target, 3, "sample %d targets", i)
+		require.Equal(t, "bedroom", s.RoomID)
 	}
 }
 
@@ -32,21 +26,15 @@ func TestGenerateSamples_FeatureRanges(t *testing.T) {
 	samples := data.GenerateSamples("test", 500, 0.5, false)
 	for _, s := range samples {
 		f := s.Features
-		if f[0] < 0 || f[0] > 1 {
-			t.Errorf("temp %.3f out of range [0, 1]", f[0])
-		}
-		if f[1] < 0 || f[1] > 1 {
-			t.Errorf("hum %.3f out of range [0, 1]", f[1])
-		}
-		if f[2] < 0 || f[2] > 1 {
-			t.Errorf("light %.3f out of range [0, 1]", f[2])
-		}
-		if f[3] != 0 && f[3] != 1 {
-			t.Errorf("presence %.0f must be 0 or 1", f[3])
-		}
-		if f[4] < 0 || f[4] > 1 {
-			t.Errorf("hour %.3f out of range [0, 1]", f[4])
-		}
+		assert.GreaterOrEqual(t, f[0], 0.0)
+		assert.LessOrEqual(t, f[0], 1.0)
+		assert.GreaterOrEqual(t, f[1], 0.0)
+		assert.LessOrEqual(t, f[1], 1.0)
+		assert.GreaterOrEqual(t, f[2], 0.0)
+		assert.LessOrEqual(t, f[2], 1.0)
+		assert.Contains(t, []float64{0, 1}, f[3])
+		assert.GreaterOrEqual(t, f[4], 0.0)
+		assert.LessOrEqual(t, f[4], 1.0)
 	}
 }
 
@@ -54,23 +42,17 @@ func TestGenerateSensors_IID(t *testing.T) {
 	rooms := []string{"kitchen", "bedroom", "livingroom"}
 	datasets := data.GenerateSensors(rooms, 50, false)
 
-	if len(datasets) != 3 {
-		t.Fatalf("expected 3 rooms, got %d", len(datasets))
-	}
+	require.Len(t, datasets, 3)
 	for _, room := range rooms {
-		if len(datasets[room]) != 50 {
-			t.Fatalf("room %s: expected 50 samples, got %d", room, len(datasets[room]))
-		}
+		require.Lenf(t, datasets[room], 50, "room %s", room)
 	}
 }
 
 func TestGenerateSensors_NonIID(t *testing.T) {
 	rooms := []string{"cold-room", "hot-room"}
 	datasets := data.GenerateSensors(rooms, 200, true)
-	if len(datasets) != 2 {
-		t.Fatalf("expected 2 rooms, got %d", len(datasets))
-	}
-	// non-IID: cold room should have lower avg temp than hot room.
+	require.Len(t, datasets, 2)
+
 	avgTemp := func(samples []data.Sample) float64 {
 		var sum float64
 		for _, s := range samples {
@@ -80,7 +62,5 @@ func TestGenerateSensors_NonIID(t *testing.T) {
 	}
 	coldAvg := avgTemp(datasets["cold-room"])
 	hotAvg := avgTemp(datasets["hot-room"])
-	if coldAvg >= hotAvg {
-		t.Fatalf("expected cold-room (%.1f) < hot-room (%.1f)", coldAvg, hotAvg)
-	}
+	require.Less(t, coldAvg, hotAvg)
 }
