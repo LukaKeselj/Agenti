@@ -1,6 +1,7 @@
 package actors
 
 import (
+	"fmt"
 	"sync"
 
 	af "github.com/LukaKeselj/Agenti/actor-framework"
@@ -151,13 +152,15 @@ func (c *CoordinatorActor) Receive(ctx af.ActorContext, msg af.Message) {
 		c.handleStartRound(ctx)
 	case MsgModelUpdate:
 		c.handleModelUpdate(ctx, msg)
+	case MsgRequestStatus:
+		c.handleRequestStatus(ctx, msg)
 	}
 }
 
 // ── Register sensor ────────────────────────────────────────────
 
 func (c *CoordinatorActor) handleRegisterSensor(msg af.Message) {
-	p, ok := msg.Payload.(RegisterSensorPayload)
+	p, ok := castPayload[RegisterSensorPayload](msg.Payload)
 	if !ok {
 		return
 	}
@@ -175,6 +178,33 @@ func (c *CoordinatorActor) handleRegisterSensor(msg af.Message) {
 	// If sensor provided a remote address, invoke callback to create remote ref.
 	if p.Address != "" && c.onRemoteSensor != nil {
 		c.onRemoteSensor(p.SensorID, p.Address)
+	}
+}
+
+// ── Request status ─────────────────────────────────────────────
+
+func (c *CoordinatorActor) handleRequestStatus(ctx af.ActorContext, msg af.Message) {
+	c.mu.Lock()
+	round := c.round
+	sensorCount := len(c.sensors)
+	c.mu.Unlock()
+
+	ctx.Log().Info("status requested",
+		"round", round,
+		"sensors", sensorCount,
+	)
+
+	// If the message has a Sender, reply with StatusResponsePayload.
+	if msg.Sender != "" {
+		if ref, err := ctx.System().Lookup(msg.Sender); err == nil {
+			ref.Tell(af.Message{
+				MsgType: "smart_home.status_response",
+				Payload: StatusResponsePayload{
+					Round:       round,
+					SensorCount: sensorCount,
+				},
+			})
+		}
 	}
 }
 
@@ -227,8 +257,10 @@ func (c *CoordinatorActor) handleStartRound(ctx af.ActorContext) {
 // ── Collect update ─────────────────────────────────────────────
 
 func (c *CoordinatorActor) handleModelUpdate(ctx af.ActorContext, msg af.Message) {
-	p, ok := msg.Payload.(ModelUpdatePayload)
+	p, ok := castPayload[ModelUpdatePayload](msg.Payload)
 	if !ok {
+		ctx.Log().Warn("model update payload type mismatch",
+			"payload_type", fmt.Sprintf("%T", msg.Payload))
 		return
 	}
 

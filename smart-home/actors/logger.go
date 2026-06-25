@@ -88,7 +88,7 @@ func NewLoggerActor(id af.ActorID) *LoggerActor {
 func (l *LoggerActor) Receive(_ af.ActorContext, msg af.Message) {
 	switch msg.MsgType {
 	case MsgRoundComplete:
-		p, ok := msg.Payload.(RoundCompletePayload)
+		p, ok := castPayload[RoundCompletePayload](msg.Payload)
 		if !ok {
 			return
 		}
@@ -98,7 +98,7 @@ func (l *LoggerActor) Receive(_ af.ActorContext, msg af.Message) {
 		l.persistState()
 
 	case MsgLogMetrics:
-		p, ok := msg.Payload.(LogMetricsPayload)
+		p, ok := castPayload[LogMetricsPayload](msg.Payload)
 		if !ok {
 			return
 		}
@@ -108,7 +108,7 @@ func (l *LoggerActor) Receive(_ af.ActorContext, msg af.Message) {
 		l.persistState()
 
 	case MsgLogEvent:
-		p, ok := msg.Payload.(LogEventPayload)
+		p, ok := castPayload[LogEventPayload](msg.Payload)
 		if !ok {
 			return
 		}
@@ -118,7 +118,7 @@ func (l *LoggerActor) Receive(_ af.ActorContext, msg af.Message) {
 		l.persistState()
 
 	case MsgDeviceStatus:
-		p, ok := msg.Payload.(DeviceStatusPayload)
+		p, ok := castPayload[DeviceStatusPayload](msg.Payload)
 		if !ok {
 			return
 		}

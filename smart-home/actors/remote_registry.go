@@ -14,4 +14,8 @@ func init() {
 	remote.RegisterPayloadType(RegisterSensorPayload{})
 	remote.RegisterPayloadType(StartRoundPayload{})
 	remote.RegisterPayloadType(TrainingCompletePayload{})
+	remote.RegisterPayloadType(RequestStatusPayload{})
+	remote.RegisterPayloadType(StatusResponsePayload{})
+	remote.RegisterPayloadType(EvaluateModelPayload{})
+	remote.RegisterPayloadType(EvaluationResultPayload{})
 }

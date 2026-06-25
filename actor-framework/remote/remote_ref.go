@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"reflect"
 	"sync"
 	"time"
@@ -65,13 +66,20 @@ func (r *RemoteActorRef) ID() af.ActorID { return r.id }
 func (r *RemoteActorRef) Tell(msg af.Message) {
 	req := marshalTell(r.id, msg)
 	if req == nil {
+		slog.Warn("remote Tell: marshalTell returned nil", "target", r.target, "actor", r.id)
 		return
 	}
 	client, err := r.getClient()
 	if err != nil {
+		slog.Warn("remote Tell: getClient failed", "target", r.target, "actor", r.id, "err", err)
 		return
 	}
-	_, _ = client.Tell(context.Background(), req)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	_, err = client.Tell(ctx, req)
+	if err != nil {
+		slog.Warn("remote Tell failed", "target", r.target, "actor", r.id, "msg_type", msg.MsgType, "err", err)
+	}
 }
 
 // Ask sends a message and waits for a single reply, or returns an error
@@ -150,7 +158,10 @@ func (r *RemoteActorRef) getClient() (RemoteActorClient, error) {
 // ── serialization ───────────────────────────────────────────────
 
 func marshalTell(actorID af.ActorID, msg af.Message) *TellRequest {
-	jsonBytes, _ := json.Marshal(msg.Payload)
+	jsonBytes, err := json.Marshal(msg.Payload)
+	if err != nil {
+		slog.Warn("marshalTell: json.Marshal failed", "actor", actorID, "msg_type", msg.MsgType, "err", err)
+	}
 	return &TellRequest{
 		ActorId:        string(actorID),
 		MsgType:        string(msg.MsgType),
@@ -195,10 +206,18 @@ func decodePayload(data []byte, typeName string) any {
 			return reflect.ValueOf(ptr).Elem().Interface() // T
 		}
 	}
-	// Fallback: generic map.
+	// TypeRegistry miss – log the first one and fallback to generic map.
+	if !ok {
+		registryMissOnce.Do(func() {
+			slog.Warn("decodePayload: type not registered, falling back to map",
+				"type", typeName)
+		})
+	}
 	var v any
 	if err := json.Unmarshal(data, &v); err != nil {
 		return data
 	}
 	return v
 }
+
+var registryMissOnce sync.Once

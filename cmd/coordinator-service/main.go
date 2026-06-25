@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"strconv"
@@ -76,6 +77,24 @@ func main() {
 	coord.SetTrainingConfig(epochs, lr)
 	coordRef := sys.MustSpawn(coord, opts)
 
+	// Explicitly register payload types for remote transport.
+	remote.RegisterPayloadType(actors.StartTrainingPayload{})
+	remote.RegisterPayloadType(actors.ModelUpdatePayload{})
+	remote.RegisterPayloadType(actors.GlobalModelUpdatePayload{})
+	remote.RegisterPayloadType(actors.RoundCompletePayload{})
+	remote.RegisterPayloadType(actors.AdjustEnvironmentPayload{})
+	remote.RegisterPayloadType(actors.DeviceStatusPayload{})
+	remote.RegisterPayloadType(actors.LogMetricsPayload{})
+	remote.RegisterPayloadType(actors.LogEventPayload{})
+	remote.RegisterPayloadType(actors.RegisterSensorPayload{})
+	remote.RegisterPayloadType(actors.StartRoundPayload{})
+	remote.RegisterPayloadType(actors.TrainingCompletePayload{})
+	remote.RegisterPayloadType(actors.RequestStatusPayload{})
+	remote.RegisterPayloadType(actors.StatusResponsePayload{})
+	remote.RegisterPayloadType(actors.EvaluateModelPayload{})
+	remote.RegisterPayloadType(actors.EvaluationResultPayload{})
+	fmt.Println("Registered payload types for remote transport")
+
 	// Set callback for remote sensor registrations.
 	coord.OnRemoteSensor(func(sensorID, addr string) {
 		ref := remote.NewRemoteActorRef(af.ActorID(sensorID), addr)
@@ -91,6 +110,9 @@ func main() {
 
 	// Generate validation set.
 	valSet := data.GenerateSamples("validation", valSamples, 0.5, false)
+	evaluator := actors.NewEvaluatorActor("evaluator", valSet)
+	evalRef := sys.MustSpawn(evaluator, opts)
+	fmt.Println("Evaluator actor spawned")
 
 	// Parse optional sensor addresses from env.
 	// Format: "sensor-kitchen=kitchen:5051,sensor-livingroom=livingroom:5052,..."
@@ -149,17 +171,41 @@ func main() {
 		}
 
 		coordWeights := coord.Weights()
-		evalMLP := model.NewMLP(5, 8, 3)
-		evalMLP.SetWeights(coordWeights)
 
-		var actuals, predictions []float64
-		for _, s := range valSet {
-			pred := evalMLP.Predict(s.Features)
-			actuals = append(actuals, s.Target...)
-			predictions = append(predictions, pred...)
+		// Ask EvaluatorActor for metrics.
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		reply, err := evalRef.Ask(ctx, af.Message{
+			MsgType: actors.MsgEvaluateModel,
+			Payload: actors.EvaluateModelPayload{
+				RoundID:       round,
+				GlobalWeights: coordWeights,
+				LoggerID:      "logger",
+			},
+		})
+		cancel()
+		if err != nil {
+			// Fallback: compute inline.
+			evalMLP := model.NewMLP(5, 8, 3)
+			evalMLP.SetWeights(coordWeights)
+			var actuals, predictions []float64
+			for _, s := range valSet {
+				pred := evalMLP.Predict(s.Features)
+				actuals = append(actuals, s.Target...)
+				predictions = append(predictions, pred...)
+			}
+			metrics := evaluation.Calculate(actuals, predictions)
+			results = append(results, evaluation.RoundResult{Round: round, Metrics: metrics})
+			fmt.Printf("  Loss: %.6f | MSE: %.6f | RMSE: %.6f | R²: %.6f\n\n",
+				logger.Rounds()[round-1].GlobalLoss, metrics.MSE, metrics.RMSE, metrics.R2)
+			continue
 		}
 
-		metrics := evaluation.Calculate(actuals, predictions)
+		res, ok := reply.Payload.(actors.EvaluationResultPayload)
+		if !ok {
+			fmt.Printf("  Unexpected reply type from evaluator\n")
+			continue
+		}
+		metrics := evaluation.Metrics{MSE: res.MSE, RMSE: res.RMSE, MAE: res.MAE, R2: res.R2Score}
 		results = append(results, evaluation.RoundResult{Round: round, Metrics: metrics})
 
 		fmt.Printf("  Loss: %.6f | MSE: %.6f | RMSE: %.6f | R²: %.6f\n\n",

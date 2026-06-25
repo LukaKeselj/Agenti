@@ -45,6 +45,14 @@ func main() {
 	coordID := env("COORD_ID", "coordinator")
 	myAddr := env("MY_ADDR", "")
 
+	// Explicitly register payload types for remote transport.
+	remote.RegisterPayloadType(actors.StartTrainingPayload{})
+	remote.RegisterPayloadType(actors.ModelUpdatePayload{})
+	remote.RegisterPayloadType(actors.GlobalModelUpdatePayload{})
+	remote.RegisterPayloadType(actors.TrainingCompletePayload{})
+	remote.RegisterPayloadType(actors.RegisterSensorPayload{})
+	fmt.Println("Registered payload types for remote transport")
+
 	fmt.Printf("Sensor %s (room: %s)\n", sensorID, roomID)
 	fmt.Printf("  Coordinator  : %s\n", coordAddr)
 	fmt.Printf("  My gRPC addr : %s\n", grpcAddr)

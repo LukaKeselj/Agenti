@@ -16,9 +16,9 @@
   <!-- x-axis labels -->
 <text x="60.0" y="370" text-anchor="middle" font-size="12" fill="#666">1</text><text x="138.9" y="370" text-anchor="middle" font-size="12" fill="#666">2</text><text x="217.8" y="370" text-anchor="middle" font-size="12" fill="#666">3</text><text x="296.7" y="370" text-anchor="middle" font-size="12" fill="#666">4</text><text x="375.6" y="370" text-anchor="middle" font-size="12" fill="#666">5</text><text x="454.4" y="370" text-anchor="middle" font-size="12" fill="#666">6</text><text x="533.3" y="370" text-anchor="middle" font-size="12" fill="#666">7</text><text x="612.2" y="370" text-anchor="middle" font-size="12" fill="#666">8</text><text x="691.1" y="370" text-anchor="middle" font-size="12" fill="#666">9</text><text x="770.0" y="370" text-anchor="middle" font-size="12" fill="#666">10</text>
   <!-- MSE line -->
-  <polyline points="60.0,30.0 138.9,251.6 217.8,343.2 296.7,349.4 375.6,349.9 454.4,349.9 533.3,350.0 612.2,350.0 691.1,350.0 770.0,350.0 " fill="none" stroke="#d32f2f" stroke-width="2"/>
+  <polyline points="60.0,30.0 138.9,243.9 217.8,341.5 296.7,349.2 375.6,349.9 454.4,350.0 533.3,350.0 612.2,350.0 691.1,350.0 770.0,350.0 " fill="none" stroke="#d32f2f" stroke-width="2"/>
   <!-- R² line -->
-  <polyline points="60.0,350.0 138.9,128.4 217.8,36.8 296.7,30.6 375.6,30.1 454.4,30.1 533.3,30.0 612.2,30.0 691.1,30.0 770.0,30.0 " fill="none" stroke="#388e3c" stroke-width="2" stroke-dasharray="5,3"/>
+  <polyline points="60.0,350.0 138.9,136.1 217.8,38.5 296.7,30.8 375.6,30.1 454.4,30.0 533.3,30.0 612.2,30.0 691.1,30.0 770.0,30.0 " fill="none" stroke="#388e3c" stroke-width="2" stroke-dasharray="5,3"/>
 
   <!-- legend -->
   <rect x="660" y="40" width="12" height="12" fill="#d32f2f"/>

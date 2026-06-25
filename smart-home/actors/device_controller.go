@@ -72,7 +72,7 @@ func (d *DeviceControllerActor) Receive(ctx af.ActorContext, msg af.Message) {
 }
 
 func (d *DeviceControllerActor) handleAdjustEnvironment(ctx af.ActorContext, msg af.Message) {
-	p, ok := msg.Payload.(AdjustEnvironmentPayload)
+	p, ok := castPayload[AdjustEnvironmentPayload](msg.Payload)
 	if !ok {
 		return
 	}

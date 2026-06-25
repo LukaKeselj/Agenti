@@ -117,7 +117,7 @@ func (s *SensorActor) Receive(ctx af.ActorContext, msg af.Message) {
 // ── Idle state ─────────────────────────────────────────────────
 
 func (s *SensorActor) handleStartTraining(ctx af.ActorContext, msg af.Message) {
-	p, ok := msg.Payload.(StartTrainingPayload)
+	p, ok := castPayload[StartTrainingPayload](msg.Payload)
 	if !ok {
 		return
 	}
@@ -199,7 +199,7 @@ func (s *SensorActor) stubTraining(self af.ActorRef, p StartTrainingPayload) {
 // ── Training complete ──────────────────────────────────────────
 
 func (s *SensorActor) handleTrainingComplete(ctx af.ActorContext, msg af.Message) {
-	p, ok := msg.Payload.(TrainingCompletePayload)
+	p, ok := castPayload[TrainingCompletePayload](msg.Payload)
 	if !ok {
 		return
 	}
@@ -225,14 +225,28 @@ func (s *SensorActor) handleTrainingComplete(ctx af.ActorContext, msg af.Message
 		}
 	}
 
+	// Sanitize weights – replace NaN/Inf with zero (Go's json cannot marshal them).
+	sanitizedWeights := make([]float64, len(p.Weights))
+	for i, w := range p.Weights {
+		if math.IsNaN(w) || math.IsInf(w, 0) {
+			sanitizedWeights[i] = 0
+		} else {
+			sanitizedWeights[i] = w
+		}
+	}
+	loss := p.Loss
+	if math.IsNaN(loss) || math.IsInf(loss, 0) {
+		loss = 0
+	}
+
 	coordRef.Tell(af.Message{
 		MsgType: MsgModelUpdate,
 		Payload: ModelUpdatePayload{
 			SensorID:   string(s.ID()),
 			RoundID:    s.roundID,
-			Weights:    p.Weights,
+			Weights:    sanitizedWeights,
 			NumSamples: p.NumSamples,
-			Loss:       p.Loss,
+			Loss:       loss,
 		},
 		Sender: ctx.Self().ID(),
 	})
@@ -247,7 +261,7 @@ func (s *SensorActor) handleTrainingComplete(ctx af.ActorContext, msg af.Message
 // ── Global model update ────────────────────────────────────────
 
 func (s *SensorActor) handleGlobalModelUpdate(msg af.Message) {
-	p, ok := msg.Payload.(GlobalModelUpdatePayload)
+	p, ok := castPayload[GlobalModelUpdatePayload](msg.Payload)
 	if !ok {
 		return
 	}

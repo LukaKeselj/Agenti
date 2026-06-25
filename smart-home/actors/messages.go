@@ -16,6 +16,9 @@ const (
 	MsgRegisterSensor     af.MessageType = "smart_home.register_sensor"
 	MsgStartRound         af.MessageType = "smart_home.start_round"
 	MsgTrainingComplete   af.MessageType = "smart_home.training_complete"
+	MsgRequestStatus      af.MessageType = "smart_home.request_status"
+	MsgEvaluateModel      af.MessageType = "smart_home.evaluate_model"
+	MsgEvaluationResult   af.MessageType = "smart_home.evaluation_result"
 )
 
 // ── Payload types ─────────────────────────────────────────────
@@ -107,3 +110,30 @@ type TrainingCompletePayload struct {
 // StartRoundPayload is sent to the Coordinator to manually trigger
 // a new FL round.
 type StartRoundPayload struct{}
+
+// RequestStatusPayload is sent to the Coordinator to request its
+// current status (round count, sensor count, etc.).
+type RequestStatusPayload struct{}
+
+// EvaluateModelPayload is sent to EvaluatorActor to evaluate global weights.
+type EvaluateModelPayload struct {
+	RoundID       int
+	GlobalWeights []float64
+	LoggerID      af.ActorID
+}
+
+// EvaluationResultPayload is the reply from EvaluatorActor with computed metrics.
+type EvaluationResultPayload struct {
+	RoundID int
+	MSE     float64
+	RMSE    float64
+	MAE     float64
+	R2Score float64
+}
+
+// StatusResponsePayload is the reply to a RequestStatus query.
+type StatusResponsePayload struct {
+	Round        int
+	SensorCount  int
+	GlobalLoss   float64
+}
