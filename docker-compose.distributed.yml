@@ -1,0 +1,134 @@
+services:
+  coordinator:
+    build:
+      context: .
+      dockerfile: Dockerfile.distributed
+      args:
+        TARGET: cmd/coordinator-service
+    container_name: coordinator
+    ports:
+      - "50051:50051"
+    environment:
+      COORD_ADDR: ":50051"
+      NUM_ROUNDS: "5"
+      EPOCHS: "1"
+      LEARNING_RATE: "0.01"
+      ROOMS: "kitchen,livingroom,bedroom,bathroom,garage"
+      SAMPLES_PER_SENSOR: "800"
+      VAL_SAMPLES: "100"
+      MIN_SENSORS: "5"
+
+  sensor-kitchen:
+    build:
+      context: .
+      dockerfile: Dockerfile.distributed
+      args:
+        TARGET: cmd/sensor-service
+    container_name: sensor-kitchen
+    ports:
+      - "5051:5051"
+    environment:
+      COORD_ADDR: "coordinator:50051"
+      SENSOR_ADDR: ":5051"
+      SENSOR_ID: "sensor-kitchen"
+      ROOM_ID: "kitchen"
+      SAMPLES: "800"
+      NON_IID: "true"
+      EPOCHS: "1"
+      LEARNING_RATE: "0.01"
+      MY_ADDR: "sensor-kitchen:5051"
+    depends_on:
+      coordinator:
+        condition: service_started
+
+  sensor-livingroom:
+    build:
+      context: .
+      dockerfile: Dockerfile.distributed
+      args:
+        TARGET: cmd/sensor-service
+    container_name: sensor-livingroom
+    ports:
+      - "5052:5052"
+    environment:
+      COORD_ADDR: "coordinator:50051"
+      SENSOR_ADDR: ":5052"
+      SENSOR_ID: "sensor-livingroom"
+      ROOM_ID: "livingroom"
+      SAMPLES: "800"
+      NON_IID: "true"
+      EPOCHS: "1"
+      LEARNING_RATE: "0.01"
+      MY_ADDR: "sensor-livingroom:5052"
+    depends_on:
+      coordinator:
+        condition: service_started
+
+  sensor-bedroom:
+    build:
+      context: .
+      dockerfile: Dockerfile.distributed
+      args:
+        TARGET: cmd/sensor-service
+    container_name: sensor-bedroom
+    ports:
+      - "5053:5053"
+    environment:
+      COORD_ADDR: "coordinator:50051"
+      SENSOR_ADDR: ":5053"
+      SENSOR_ID: "sensor-bedroom"
+      ROOM_ID: "bedroom"
+      SAMPLES: "800"
+      NON_IID: "true"
+      EPOCHS: "1"
+      LEARNING_RATE: "0.01"
+      MY_ADDR: "sensor-bedroom:5053"
+    depends_on:
+      coordinator:
+        condition: service_started
+
+  sensor-bathroom:
+    build:
+      context: .
+      dockerfile: Dockerfile.distributed
+      args:
+        TARGET: cmd/sensor-service
+    container_name: sensor-bathroom
+    ports:
+      - "5054:5054"
+    environment:
+      COORD_ADDR: "coordinator:50051"
+      SENSOR_ADDR: ":5054"
+      SENSOR_ID: "sensor-bathroom"
+      ROOM_ID: "bathroom"
+      SAMPLES: "800"
+      NON_IID: "true"
+      EPOCHS: "1"
+      LEARNING_RATE: "0.01"
+      MY_ADDR: "sensor-bathroom:5054"
+    depends_on:
+      coordinator:
+        condition: service_started
+
+  sensor-garage:
+    build:
+      context: .
+      dockerfile: Dockerfile.distributed
+      args:
+        TARGET: cmd/sensor-service
+    container_name: sensor-garage
+    ports:
+      - "5055:5055"
+    environment:
+      COORD_ADDR: "coordinator:50051"
+      SENSOR_ADDR: ":5055"
+      SENSOR_ID: "sensor-garage"
+      ROOM_ID: "garage"
+      SAMPLES: "800"
+      NON_IID: "true"
+      EPOCHS: "1"
+      LEARNING_RATE: "0.01"
+      MY_ADDR: "sensor-garage:5055"
+    depends_on:
+      coordinator:
+        condition: service_started

@@ -1,0 +1,9 @@
+{
+  "config": "./demo/config.yaml",
+  "final_mae": 0.03369,
+  "final_mse": 0.004669,
+  "final_r2": 0.939877,
+  "final_rmse": 0.06833,
+  "rounds_completed": 10,
+  "timestamp": "2026-06-25T20:50:59+02:00"
+}

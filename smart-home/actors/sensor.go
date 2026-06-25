@@ -30,6 +30,7 @@ type SensorActor struct {
 	mlp         *model.MLP
 	trainData   []data.Sample
 	coordinator  af.ActorID
+	coordinatorRef af.ActorRef // optional, overrides Lookup for remote coord
 	persister   *persistence.Persister
 }
 
@@ -41,6 +42,12 @@ type sensorSavedState struct {
 
 func (s *SensorActor) SetPersister(p *persistence.Persister) {
 	s.persister = p
+}
+
+// SetCoordinatorRef overrides local Lookup for the coordinator,
+// allowing the sensor to send messages via a RemoteActorRef.
+func (s *SensorActor) SetCoordinatorRef(ref af.ActorRef) {
+	s.coordinatorRef = ref
 }
 
 func (s *SensorActor) OnPreStart(ctx af.ActorContext) error {
@@ -204,14 +211,18 @@ func (s *SensorActor) handleTrainingComplete(ctx af.ActorContext, msg af.Message
 
 	s.systemLog(ctx, "training complete", "round", s.roundID, "loss", p.Loss)
 
-	// Send ModelUpdate to coordinator.
-	coordRef, err := ctx.System().Lookup(s.coordinator)
-	if err != nil {
-		s.systemLog(ctx, "coordinator not found", "id", s.coordinator)
-		s.mu.Lock()
-		s.state = "idle"
-		s.mu.Unlock()
-		return
+	// Send ModelUpdate to coordinator (remote ref takes priority).
+	coordRef := s.coordinatorRef
+	if coordRef == nil {
+		var err error
+		coordRef, err = ctx.System().Lookup(s.coordinator)
+		if err != nil {
+			s.systemLog(ctx, "coordinator not found", "id", s.coordinator)
+			s.mu.Lock()
+			s.state = "idle"
+			s.mu.Unlock()
+			return
+		}
 	}
 
 	coordRef.Tell(af.Message{

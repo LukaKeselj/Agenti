@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 400">
+  <rect width="800" height="400" fill="#fff"/>
+  <text x="400" y="20" text-anchor="middle" font-size="16" font-weight="bold" fill="#333">Convergence — MSE and R² per FL Round</text>
+
+  <!-- MSE axis label -->
+  <text x="15" y="175" text-anchor="middle" font-size="12" fill="#d32f2f" transform="rotate(-90,15,175)">MSE</text>
+  <!-- R² axis label -->
+  <text x="780" y="175" text-anchor="middle" font-size="12" fill="#388e3c" transform="rotate(-90,780,175)">R²</text>
+
+  <!-- grid -->
+<line x1="60" y1="30.0" x2="770" y2="30.0" stroke="#eee" stroke-width="1"/><line x1="60" y1="110.0" x2="770" y2="110.0" stroke="#eee" stroke-width="1"/><line x1="60" y1="190.0" x2="770" y2="190.0" stroke="#eee" stroke-width="1"/><line x1="60" y1="270.0" x2="770" y2="270.0" stroke="#eee" stroke-width="1"/><line x1="60" y1="350.0" x2="770" y2="350.0" stroke="#eee" stroke-width="1"/>  
+  <!-- axes -->
+  <line x1="60" y1="350" x2="770" y2="350" stroke="#333" stroke-width="1"/>
+  <line x1="60" y1="30" x2="60" y2="350" stroke="#333" stroke-width="1"/>
+
+  <!-- x-axis labels -->
+<text x="60.0" y="370" text-anchor="middle" font-size="12" fill="#666">1</text><text x="138.9" y="370" text-anchor="middle" font-size="12" fill="#666">2</text><text x="217.8" y="370" text-anchor="middle" font-size="12" fill="#666">3</text><text x="296.7" y="370" text-anchor="middle" font-size="12" fill="#666">4</text><text x="375.6" y="370" text-anchor="middle" font-size="12" fill="#666">5</text><text x="454.4" y="370" text-anchor="middle" font-size="12" fill="#666">6</text><text x="533.3" y="370" text-anchor="middle" font-size="12" fill="#666">7</text><text x="612.2" y="370" text-anchor="middle" font-size="12" fill="#666">8</text><text x="691.1" y="370" text-anchor="middle" font-size="12" fill="#666">9</text><text x="770.0" y="370" text-anchor="middle" font-size="12" fill="#666">10</text>
+  <!-- MSE line -->
+  <polyline points="60.0,30.0 138.9,251.6 217.8,343.2 296.7,349.4 375.6,349.9 454.4,349.9 533.3,350.0 612.2,350.0 691.1,350.0 770.0,350.0 " fill="none" stroke="#d32f2f" stroke-width="2"/>
+  <!-- R² line -->
+  <polyline points="60.0,350.0 138.9,128.4 217.8,36.8 296.7,30.6 375.6,30.1 454.4,30.1 533.3,30.0 612.2,30.0 691.1,30.0 770.0,30.0 " fill="none" stroke="#388e3c" stroke-width="2" stroke-dasharray="5,3"/>
+
+  <!-- legend -->
+  <rect x="660" y="40" width="12" height="12" fill="#d32f2f"/>
+  <text x="675" y="50" font-size="12" fill="#333">MSE</text>
+  <line x1="660" y1="70" x2="675" y2="80" stroke="#388e3c" stroke-width="2" stroke-dasharray="5,3"/>
+  <text x="660" y="80" font-size="12" fill="#333">R²</text>
+</svg>

@@ -1,0 +1,15 @@
+FROM golang:1.26-alpine AS builder
+ARG TARGET=cmd/demo
+WORKDIR /build
+COPY go.mod go.sum ./
+RUN go mod download
+COPY . .
+RUN CGO_ENABLED=0 go build -o /build/app ./${TARGET}
+
+FROM alpine:3.21
+RUN apk add --no-cache ca-certificates
+WORKDIR /app
+COPY --from=builder /build/app /app/app
+COPY --from=builder /build/demo/config.yaml /app/demo/config.yaml
+EXPOSE 50051
+CMD ["/app/app"]

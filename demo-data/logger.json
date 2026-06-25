@@ -1,0 +1,308 @@
+{
+  "rounds": [
+    {
+      "RoundID": 1,
+      "GlobalLoss": 0.060918000000000014,
+      "NumClients": 5,
+      "ElapsedMs": 100
+    },
+    {
+      "RoundID": 2,
+      "GlobalLoss": 0.0226402,
+      "NumClients": 5,
+      "ElapsedMs": 100
+    },
+    {
+      "RoundID": 3,
+      "GlobalLoss": 0.006357000000000001,
+      "NumClients": 5,
+      "ElapsedMs": 100
+    },
+    {
+      "RoundID": 4,
+      "GlobalLoss": 0.0050755999999999996,
+      "NumClients": 5,
+      "ElapsedMs": 100
+    },
+    {
+      "RoundID": 5,
+      "GlobalLoss": 0.0049467999999999995,
+      "NumClients": 5,
+      "ElapsedMs": 100
+    },
+    {
+      "RoundID": 6,
+      "GlobalLoss": 0.004915600000000001,
+      "NumClients": 5,
+      "ElapsedMs": 100
+    },
+    {
+      "RoundID": 7,
+      "GlobalLoss": 0.0049036,
+      "NumClients": 5,
+      "ElapsedMs": 100
+    },
+    {
+      "RoundID": 8,
+      "GlobalLoss": 0.0048976,
+      "NumClients": 5,
+      "ElapsedMs": 100
+    },
+    {
+      "RoundID": 9,
+      "GlobalLoss": 0.004895,
+      "NumClients": 5,
+      "ElapsedMs": 100
+    },
+    {
+      "RoundID": 10,
+      "GlobalLoss": 0.0048936,
+      "NumClients": 5,
+      "ElapsedMs": 100
+    }
+  ],
+  "metrics": null,
+  "events": null,
+  "devices": [
+    {
+      "RoomID": "all",
+      "DeviceType": "ac",
+      "Action": "adjusted",
+      "ActorID": "device-ctrl"
+    },
+    {
+      "RoomID": "all",
+      "DeviceType": "heating",
+      "Action": "adjusted",
+      "ActorID": "device-ctrl"
+    },
+    {
+      "RoomID": "all",
+      "DeviceType": "blinds",
+      "Action": "adjusted",
+      "ActorID": "device-ctrl"
+    },
+    {
+      "RoomID": "all",
+      "DeviceType": "lights",
+      "Action": "adjusted",
+      "ActorID": "device-ctrl"
+    },
+    {
+      "RoomID": "all",
+      "DeviceType": "ac",
+      "Action": "adjusted",
+      "ActorID": "device-ctrl"
+    },
+    {
+      "RoomID": "all",
+      "DeviceType": "heating",
+      "Action": "adjusted",
+      "ActorID": "device-ctrl"
+    },
+    {
+      "RoomID": "all",
+      "DeviceType": "blinds",
+      "Action": "adjusted",
+      "ActorID": "device-ctrl"
+    },
+    {
+      "RoomID": "all",
+      "DeviceType": "lights",
+      "Action": "adjusted",
+      "ActorID": "device-ctrl"
+    },
+    {
+      "RoomID": "all",
+      "DeviceType": "ac",
+      "Action": "adjusted",
+      "ActorID": "device-ctrl"
+    },
+    {
+      "RoomID": "all",
+      "DeviceType": "heating",
+      "Action": "adjusted",
+      "ActorID": "device-ctrl"
+    },
+    {
+      "RoomID": "all",
+      "DeviceType": "blinds",
+      "Action": "adjusted",
+      "ActorID": "device-ctrl"
+    },
+    {
+      "RoomID": "all",
+      "DeviceType": "lights",
+      "Action": "adjusted",
+      "ActorID": "device-ctrl"
+    },
+    {
+      "RoomID": "all",
+      "DeviceType": "ac",
+      "Action": "adjusted",
+      "ActorID": "device-ctrl"
+    },
+    {
+      "RoomID": "all",
+      "DeviceType": "heating",
+      "Action": "adjusted",
+      "ActorID": "device-ctrl"
+    },
+    {
+      "RoomID": "all",
+      "DeviceType": "blinds",
+      "Action": "adjusted",
+      "ActorID": "device-ctrl"
+    },
+    {
+      "RoomID": "all",
+      "DeviceType": "lights",
+      "Action": "adjusted",
+      "ActorID": "device-ctrl"
+    },
+    {
+      "RoomID": "all",
+      "DeviceType": "ac",
+      "Action": "adjusted",
+      "ActorID": "device-ctrl"
+    },
+    {
+      "RoomID": "all",
+      "DeviceType": "heating",
+      "Action": "adjusted",
+      "ActorID": "device-ctrl"
+    },
+    {
+      "RoomID": "all",
+      "DeviceType": "blinds",
+      "Action": "adjusted",
+      "ActorID": "device-ctrl"
+    },
+    {
+      "RoomID": "all",
+      "DeviceType": "lights",
+      "Action": "adjusted",
+      "ActorID": "device-ctrl"
+    },
+    {
+      "RoomID": "all",
+      "DeviceType": "ac",
+      "Action": "adjusted",
+      "ActorID": "device-ctrl"
+    },
+    {
+      "RoomID": "all",
+      "DeviceType": "heating",
+      "Action": "adjusted",
+      "ActorID": "device-ctrl"
+    },
+    {
+      "RoomID": "all",
+      "DeviceType": "blinds",
+      "Action": "adjusted",
+      "ActorID": "device-ctrl"
+    },
+    {
+      "RoomID": "all",
+      "DeviceType": "lights",
+      "Action": "adjusted",
+      "ActorID": "device-ctrl"
+    },
+    {
+      "RoomID": "all",
+      "DeviceType": "ac",
+      "Action": "adjusted",
+      "ActorID": "device-ctrl"
+    },
+    {
+      "RoomID": "all",
+      "DeviceType": "heating",
+      "Action": "adjusted",
+      "ActorID": "device-ctrl"
+    },
+    {
+      "RoomID": "all",
+      "DeviceType": "blinds",
+      "Action": "adjusted",
+      "ActorID": "device-ctrl"
+    },
+    {
+      "RoomID": "all",
+      "DeviceType": "lights",
+      "Action": "adjusted",
+      "ActorID": "device-ctrl"
+    },
+    {
+      "RoomID": "all",
+      "DeviceType": "ac",
+      "Action": "adjusted",
+      "ActorID": "device-ctrl"
+    },
+    {
+      "RoomID": "all",
+      "DeviceType": "heating",
+      "Action": "adjusted",
+      "ActorID": "device-ctrl"
+    },
+    {
+      "RoomID": "all",
+      "DeviceType": "blinds",
+      "Action": "adjusted",
+      "ActorID": "device-ctrl"
+    },
+    {
+      "RoomID": "all",
+      "DeviceType": "lights",
+      "Action": "adjusted",
+      "ActorID": "device-ctrl"
+    },
+    {
+      "RoomID": "all",
+      "DeviceType": "ac",
+      "Action": "adjusted",
+      "ActorID": "device-ctrl"
+    },
+    {
+      "RoomID": "all",
+      "DeviceType": "heating",
+      "Action": "adjusted",
+      "ActorID": "device-ctrl"
+    },
+    {
+      "RoomID": "all",
+      "DeviceType": "blinds",
+      "Action": "adjusted",
+      "ActorID": "device-ctrl"
+    },
+    {
+      "RoomID": "all",
+      "DeviceType": "lights",
+      "Action": "adjusted",
+      "ActorID": "device-ctrl"
+    },
+    {
+      "RoomID": "all",
+      "DeviceType": "ac",
+      "Action": "adjusted",
+      "ActorID": "device-ctrl"
+    },
+    {
+      "RoomID": "all",
+      "DeviceType": "heating",
+      "Action": "adjusted",
+      "ActorID": "device-ctrl"
+    },
+    {
+      "RoomID": "all",
+      "DeviceType": "blinds",
+      "Action": "adjusted",
+      "ActorID": "device-ctrl"
+    },
+    {
+      "RoomID": "all",
+      "DeviceType": "lights",
+      "Action": "adjusted",
+      "ActorID": "device-ctrl"
+    }
+  ]
+}

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"reflect"
 	"sync"
 	"time"
 
@@ -11,6 +12,29 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 )
+
+// ── Payload type registry ─────────────────────────────────────────
+// Remote messages carry payloads as JSON. The type registry lets
+// decodePayload reconstruct typed Go structs instead of map[string]any.
+
+var (
+	payloadRegistryMu sync.RWMutex
+	payloadRegistry   = map[string]func() any{} // typeName → factory returning *T
+)
+
+// RegisterPayloadType registers a payload type so that decodePayload can
+// reconstruct it as the original Go struct (not a generic map).
+//
+//	remote.RegisterPayloadType(actors.StartTrainingPayload{})
+func RegisterPayloadType(example any) {
+	name := fmt.Sprintf("%T", example)
+	typ := reflect.TypeOf(example)
+	payloadRegistryMu.Lock()
+	payloadRegistry[name] = func() any {
+		return reflect.New(typ).Interface()
+	}
+	payloadRegistryMu.Unlock()
+}
 
 // RemoteActorRef implements af.ActorRef and forwards every call over gRPC
 // to a remote actor living in another process or machine.
@@ -157,13 +181,24 @@ func unmarshalReply(resp *AskResponse) af.Message {
 	}
 }
 
-func decodePayload(data []byte, _ string) any {
+func decodePayload(data []byte, typeName string) any {
 	if len(data) == 0 {
 		return nil
 	}
+	// Try registered type first.
+	payloadRegistryMu.RLock()
+	factory, ok := payloadRegistry[typeName]
+	payloadRegistryMu.RUnlock()
+	if ok {
+		ptr := factory() // *T
+		if err := json.Unmarshal(data, ptr); err == nil {
+			return reflect.ValueOf(ptr).Elem().Interface() // T
+		}
+	}
+	// Fallback: generic map.
 	var v any
 	if err := json.Unmarshal(data, &v); err != nil {
-		return data // fallback – return raw bytes
+		return data
 	}
 	return v
 }

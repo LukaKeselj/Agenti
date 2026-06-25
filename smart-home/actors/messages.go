@@ -93,6 +93,7 @@ type RegisterSensorPayload struct {
 	SensorID     string
 	RoomID       string
 	NumSamples   int
+	Address      string // gRPC address for remote sensors (empty = local)
 }
 
 // TrainingCompletePayload is an internal message a SensorActor sends

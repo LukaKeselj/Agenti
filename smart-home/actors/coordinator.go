@@ -32,6 +32,9 @@ type CoordinatorActor struct {
 	loggerRef af.ActorID
 	deviceRef af.ActorID
 	persister *persistence.Persister
+
+	sensorRemoteRefs map[string]af.ActorRef
+	onRemoteSensor   func(sensorID, addr string) // callback to create remote ref
 }
 
 type sensorInfo struct {
@@ -114,6 +117,24 @@ func (c *CoordinatorActor) persistState() {
 	_ = c.persister.Save(string(c.ID()), state)
 }
 
+// OnRemoteSensor sets a callback invoked when a sensor registers with a
+// non-empty Address field. The callback should create a RemoteActorRef
+// and call SetSensorRemoteRef on the coordinator.
+func (c *CoordinatorActor) OnRemoteSensor(fn func(sensorID, addr string)) {
+	c.onRemoteSensor = fn
+}
+
+// SetSensorRemoteRef registers a remote sensor so the coordinator can
+// send messages to it via gRPC instead of local Lookup.
+func (c *CoordinatorActor) SetSensorRemoteRef(id string, ref af.ActorRef) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.sensorRemoteRefs == nil {
+		c.sensorRemoteRefs = make(map[string]af.ActorRef)
+	}
+	c.sensorRemoteRefs[id] = ref
+}
+
 // SetTrainingConfig overrides the default epochs and learning rate used in FL rounds.
 func (c *CoordinatorActor) SetTrainingConfig(epochs int, lr float64) {
 	c.mu.Lock()
@@ -150,6 +171,11 @@ func (c *CoordinatorActor) handleRegisterSensor(msg af.Message) {
 		}
 	}
 	c.mu.Unlock()
+
+	// If sensor provided a remote address, invoke callback to create remote ref.
+	if p.Address != "" && c.onRemoteSensor != nil {
+		c.onRemoteSensor(p.SensorID, p.Address)
+	}
 }
 
 // ── Start round ────────────────────────────────────────────────
@@ -180,8 +206,8 @@ func (c *CoordinatorActor) handleStartRound(ctx af.ActorContext) {
 	c.mu.Unlock()
 
 	for _, id := range sensorIDs {
-		ref, err := ctx.System().Lookup(af.ActorID(id))
-		if err != nil {
+		ref := c.lookupRef(ctx, id)
+		if ref == nil {
 			ctx.Log().Warn("sensor not found", "sensor_id", id)
 			continue
 		}
@@ -262,8 +288,8 @@ func (c *CoordinatorActor) aggregateAndFinalise(ctx af.ActorContext) {
 
 	// Send GlobalModelUpdate to all sensors.
 	for _, u := range updates {
-		ref, err := ctx.System().Lookup(af.ActorID(u.SensorID))
-		if err != nil {
+		ref := c.lookupRef(ctx, u.SensorID)
+		if ref == nil {
 			continue
 		}
 		ref.Tell(af.Message{
@@ -339,19 +365,42 @@ func (c *CoordinatorActor) Weights() []float64 {
 	return copyWeights(c.globalWeights)
 }
 
+// lookupRef returns an ActorRef for the given sensor ID, preferring a
+// remote ref if one has been registered, otherwise falling back to
+// a local Lookup.
+func (c *CoordinatorActor) lookupRef(ctx af.ActorContext, id string) af.ActorRef {
+	c.mu.Lock()
+	if r, ok := c.sensorRemoteRefs[id]; ok {
+		c.mu.Unlock()
+		return r
+	}
+	c.mu.Unlock()
+	ref, err := ctx.System().Lookup(af.ActorID(id))
+	if err != nil {
+		return nil
+	}
+	return ref
+}
+
 // StartRound triggers a new FL round (can be called from outside).
 func StartRound(ref af.ActorRef) {
 	ref.Tell(af.Message{MsgType: MsgStartRound, Payload: StartRoundPayload{}})
 }
 
 // RegisterSensor registers a sensor with the coordinator.
-func RegisterSensor(ref af.ActorRef, sensorID, roomID string, numSamples int) {
+// The address parameter is the gRPC address for remote sensors (empty = local).
+func RegisterSensor(ref af.ActorRef, sensorID, roomID string, numSamples int, address ...string) {
+	addr := ""
+	if len(address) > 0 {
+		addr = address[0]
+	}
 	ref.Tell(af.Message{
 		MsgType: MsgRegisterSensor,
 		Payload: RegisterSensorPayload{
 			SensorID:   sensorID,
 			RoomID:     roomID,
 			NumSamples: numSamples,
+			Address:    addr,
 		},
 	})
 }
