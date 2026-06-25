@@ -79,6 +79,9 @@ func NewActorSystem(name string) *ActorSystem {
 // Name returns the system's name.
 func (s *ActorSystem) Name() string { return s.name }
 
+// Log returns the system's structured logger.
+func (s *ActorSystem) Log() *slog.Logger { return s.log }
+
 // ─────────────────────────────────────────────
 // Spawn
 // ─────────────────────────────────────────────

@@ -1,0 +1,57 @@
+syntax = "proto3";
+
+package remote;
+
+option go_package = "github.com/LukaKeselj/Agenti/actor-framework/remote";
+
+// RemoteActor service allows transparent remote actor communication.
+service RemoteActor {
+  // Tell sends a fire-and-forget message to a remote actor.
+  rpc Tell(TellRequest) returns (TellResponse);
+
+  // Ask sends a message and waits for a reply (with server-side timeout).
+  rpc Ask(AskRequest) returns (AskResponse);
+
+  // Stop gracefully stops a remote actor.
+  rpc Stop(StopRequest) returns (StopResponse);
+}
+
+// ── Tell ────────────────────────────────────────────────
+
+message TellRequest {
+  string actor_id        = 1;
+  string msg_type        = 2;
+  bytes  payload_json    = 3;   // JSON-encoded payload
+  string payload_type    = 4;   // fully-qualified Go type name for deserialisation
+  string sender          = 5;
+  int64  timestamp_nanos = 6;   // Unix nanosecond timestamp
+}
+
+message TellResponse {}
+
+// ── Ask ─────────────────────────────────────────────────
+
+message AskRequest {
+  string actor_id        = 1;
+  string msg_type        = 2;
+  bytes  payload_json    = 3;
+  string payload_type    = 4;
+  string sender          = 5;
+  int64  timestamp_nanos = 6;
+  int64  timeout_ms      = 7;   // server-side timeout for Ask
+}
+
+message AskResponse {
+  bool   success       = 1;
+  bytes  payload_json  = 2;
+  string payload_type  = 3;
+  string error         = 4;
+}
+
+// ── Stop ────────────────────────────────────────────────
+
+message StopRequest {
+  string actor_id = 1;
+}
+
+message StopResponse {}
