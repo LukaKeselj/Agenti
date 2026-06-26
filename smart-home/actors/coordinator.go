@@ -296,6 +296,12 @@ func (c *CoordinatorActor) aggregateAndFinalise(ctx af.ActorContext) {
 	for _, u := range c.pendingUpdates {
 		updates = append(updates, u)
 	}
+	// Collect all registered sensor IDs so GlobalModelUpdate reaches every sensor,
+	// including any that missed this round (e.g. crashed and restarted).
+	allSensorIDs := make([]string, 0, len(c.sensors))
+	for id := range c.sensors {
+		allSensorIDs = append(allSensorIDs, id)
+	}
 	totalSamples := 0
 	for _, u := range updates {
 		totalSamples += u.NumSamples
@@ -322,9 +328,9 @@ func (c *CoordinatorActor) aggregateAndFinalise(ctx af.ActorContext) {
 	elapsed := time.Since(c.roundStart).Milliseconds()
 	c.mu.Unlock()
 
-	// Send GlobalModelUpdate to all sensors.
-	for _, u := range updates {
-		ref := c.lookupRef(ctx, u.SensorID)
+	// Send GlobalModelUpdate to ALL registered sensors, not just round responders.
+	for _, id := range allSensorIDs {
+		ref := c.lookupRef(ctx, id)
 		if ref == nil {
 			continue
 		}

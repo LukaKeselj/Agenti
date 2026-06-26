@@ -163,11 +163,18 @@ func main() {
 		actors.StartRound(coordRef)
 
 		time.Sleep(1 * time.Second)
-		for {
+		roundDeadline := time.Now().Add(30 * time.Second)
+		roundCompleted := false
+		for time.Now().Before(roundDeadline) {
 			if rd, ok := logger.LastRound(); ok && rd.RoundID == round {
+				roundCompleted = true
 				break
 			}
 			time.Sleep(200 * time.Millisecond)
+		}
+		if !roundCompleted {
+			fmt.Printf("  ⚠ Round %d did not complete within timeout\n\n", round)
+			continue
 		}
 
 		coordWeights := coord.Weights()
@@ -195,8 +202,9 @@ func main() {
 			}
 			metrics := evaluation.Calculate(actuals, predictions)
 			results = append(results, evaluation.RoundResult{Round: round, Metrics: metrics})
+			lastRound, _ := logger.LastRound()
 			fmt.Printf("  Loss: %.6f | MSE: %.6f | RMSE: %.6f | R²: %.6f\n\n",
-				logger.Rounds()[round-1].GlobalLoss, metrics.MSE, metrics.RMSE, metrics.R2)
+				lastRound.GlobalLoss, metrics.MSE, metrics.RMSE, metrics.R2)
 			continue
 		}
 
@@ -208,8 +216,9 @@ func main() {
 		metrics := evaluation.Metrics{MSE: res.MSE, RMSE: res.RMSE, MAE: res.MAE, R2: res.R2Score}
 		results = append(results, evaluation.RoundResult{Round: round, Metrics: metrics})
 
+		lastRound, _ := logger.LastRound()
 		fmt.Printf("  Loss: %.6f | MSE: %.6f | RMSE: %.6f | R²: %.6f\n\n",
-			logger.Rounds()[round-1].GlobalLoss, metrics.MSE, metrics.RMSE, metrics.R2)
+			lastRound.GlobalLoss, metrics.MSE, metrics.RMSE, metrics.R2)
 	}
 
 	// ── Results ──────────────────────────────────────────────
