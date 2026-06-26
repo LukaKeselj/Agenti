@@ -324,10 +324,4 @@ type ActorFailedPayload struct {
 	Error     string
 }
 
-// RestartActorPayload is sent by a supervisor to instruct the system
-// to restart a specific actor.
-type RestartActorPayload struct {
-	ActorID  ActorID
-	Strategy string
-	DelayMs  int64
-}
+

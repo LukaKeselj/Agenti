@@ -26,10 +26,9 @@ const (
 	MsgRestarting MessageType = "system.restarting"
 
 	// Supervision messages
-	MsgActorFailed  MessageType = "supervision.actor_failed"
-	MsgRestartActor MessageType = "supervision.restart_actor"
-	MsgStatusCheck  MessageType = "supervision.status_check"
-	MsgHeartbeat    MessageType = "supervision.heartbeat"
+	MsgActorFailed MessageType = "supervision.actor_failed"
+	MsgStatusCheck MessageType = "supervision.status_check"
+	MsgHeartbeat   MessageType = "supervision.heartbeat"
 )
 
 // Message is the envelope passed between actors.

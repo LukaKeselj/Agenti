@@ -107,10 +107,15 @@ func (s *SensorActor) Receive(ctx af.ActorContext, msg af.Message) {
 		s.handleGlobalModelUpdate(msg)
 	case af.MsgStatusCheck:
 		// Reply to supervisor heartbeat.
-		ctx.Self().Tell(af.Message{
-			MsgType: af.MsgHeartbeat,
-			Sender:  ctx.Self().ID(),
-		})
+		if ref := ctx.Sender(); ref != nil {
+			ref.Tell(af.Message{
+				MsgType: af.MsgHeartbeat,
+				Sender:  ctx.Self().ID(),
+			})
+		}
+	// Handle crash simulation for demo supervision.
+	case af.MessageType("crash"):
+		panic("simulated crash for demo")
 	}
 }
 
