@@ -63,7 +63,6 @@ func main() {
 	fmt.Println()
 
 	sys := af.NewActorSystem("coordinator")
-	defer sys.Shutdown()
 
 	opts := af.DefaultSpawnOptions()
 
@@ -238,4 +237,6 @@ func main() {
 	fmt.Println("╔══════════════════════════════════════════════════╗")
 	fmt.Println("║            Coordinator complete!                 ║")
 	fmt.Println("╚══════════════════════════════════════════════════╝")
+	os.Stdout.Sync() // flush stdout before slog (stderr) shutdown messages
+	sys.Shutdown()
 }
