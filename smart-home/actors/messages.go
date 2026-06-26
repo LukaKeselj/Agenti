@@ -138,7 +138,6 @@ type EvaluationResultPayload struct {
 
 // StatusResponsePayload is the reply to a RequestStatus query.
 type StatusResponsePayload struct {
-	Round        int
-	SensorCount  int
-	GlobalLoss   float64
+	Round       int
+	SensorCount int
 }

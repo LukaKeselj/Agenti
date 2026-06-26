@@ -114,8 +114,7 @@ func (s *ActorSystem) Spawn(actor Actor, opts SpawnOptions) (ActorRef, error) {
 		mb = NewMailbox(opts.MailboxCapacity, opts.MailboxStrategy)
 	}
 
-	stopCh := make(chan struct{})
-	ref := newLocalActorRef(id, mb, stopCh)
+	ref := newLocalActorRef(id, mb)
 
 	goCtx, cancel := context.WithCancel(context.Background())
 	actCtx := newActorContext(ref, s, goCtx, cancel)

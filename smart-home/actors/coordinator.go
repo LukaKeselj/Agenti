@@ -62,14 +62,15 @@ type coordinatorSavedState struct {
 // numWeights is the number of weights in the MLP model (e.g. 75 for 5→8→3).
 func NewCoordinatorActor(id af.ActorID, loggerID, deviceID af.ActorID, numWeights int) *CoordinatorActor {
 	return &CoordinatorActor{
-		BaseActor:     af.NewBaseActor(id),
-		sensors:       make(map[string]sensorInfo),
-		pendingUpdates: make(map[string]ModelUpdatePayload),
-		loggerRef:     loggerID,
-		deviceRef:     deviceID,
-		numWeights:    numWeights,
-		numEpochs:     5,
-		learningRate:  0.01,
+		BaseActor:        af.NewBaseActor(id),
+		sensors:          make(map[string]sensorInfo),
+		pendingUpdates:   make(map[string]ModelUpdatePayload),
+		sensorRemoteRefs: make(map[string]af.ActorRef),
+		loggerRef:        loggerID,
+		deviceRef:        deviceID,
+		numWeights:       numWeights,
+		numEpochs:        5,
+		learningRate:     0.01,
 	}
 }
 
@@ -132,9 +133,6 @@ func (c *CoordinatorActor) OnRemoteSensor(fn func(sensorID, addr string)) {
 func (c *CoordinatorActor) SetSensorRemoteRef(id string, ref af.ActorRef) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	if c.sensorRemoteRefs == nil {
-		c.sensorRemoteRefs = make(map[string]af.ActorRef)
-	}
 	c.sensorRemoteRefs[id] = ref
 }
 

@@ -105,11 +105,10 @@ type ActorRef interface {
 type localActorRef struct {
 	id      ActorID
 	mailbox *Mailbox
-	stopCh  chan struct{}
 }
 
-func newLocalActorRef(id ActorID, mb *Mailbox, stopCh chan struct{}) *localActorRef {
-	return &localActorRef{id: id, mailbox: mb, stopCh: stopCh}
+func newLocalActorRef(id ActorID, mb *Mailbox) *localActorRef {
+	return &localActorRef{id: id, mailbox: mb}
 }
 
 func (r *localActorRef) ID() ActorID { return r.id }

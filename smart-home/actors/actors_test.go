@@ -173,26 +173,31 @@ func TestLoggerActor_RecordsRound(t *testing.T) {
 	require.Equal(t, 3, round.NumClients)
 }
 
-func TestLoggerActor_ConcurrentAccess(t *testing.T) {
+func TestLoggerActor_ConcurrentMessages(t *testing.T) {
 	sys := af.NewActorSystem("test")
 	defer sys.Shutdown()
 
 	logger := actors.NewLoggerActor("logger")
-	mustSpawn(t, sys, logger)
+	logRef := mustSpawn(t, sys, logger)
 	time.Sleep(50 * time.Millisecond)
 
-	// Send messages from multiple goroutines.
+	// Send messages to the logger from multiple goroutines concurrently.
 	var wg sync.WaitGroup
-	for range 20 {
+	for i := range 20 {
 		wg.Add(1)
-		go func() {
+		go func(round int) {
 			defer wg.Done()
-			_, _ = sys.Spawn(actors.NewSensorActor(
-				af.ActorID("s"), "r", ""), af.DefaultSpawnOptions())
-		}()
+			logRef.Tell(af.Message{
+				MsgType: actors.MsgRoundComplete,
+				Payload: actors.RoundCompletePayload{RoundID: round, NumClients: 1},
+			})
+		}(i + 1)
 	}
 	wg.Wait()
-	// Just ensure no panic.
+	time.Sleep(100 * time.Millisecond)
+
+	// All 20 messages should have been recorded without a data race.
+	require.Len(t, logger.Rounds(), 20)
 }
 
 // ── Integration: full smart-home flow ──────────────────────────

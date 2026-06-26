@@ -47,7 +47,6 @@ type Mailbox struct {
 
 	// Counters – accessed atomically.
 	enqueued uint64
-	dequeued uint64
 	dropped  uint64
 }
 
@@ -151,18 +150,6 @@ func (mb *Mailbox) C() <-chan Message {
 	return mb.ch
 }
 
-// TryDequeue attempts a non-blocking read.
-// Returns (msg, true) if a message was available, or (zero, false) otherwise.
-func (mb *Mailbox) TryDequeue() (Message, bool) {
-	select {
-	case msg := <-mb.ch:
-		atomic.AddUint64(&mb.dequeued, 1)
-		return msg, true
-	default:
-		return Message{}, false
-	}
-}
-
 // Close shuts down the mailbox.  After Close, Enqueue is a no-op and
 // the consumer channel will be drained and then closed.
 func (mb *Mailbox) Close() {
@@ -180,7 +167,6 @@ func (mb *Mailbox) Close() {
 // Stats returns a snapshot of mailbox counters.
 type MailboxStats struct {
 	Enqueued uint64
-	Dequeued uint64
 	Dropped  uint64
 	Pending  int
 }
@@ -188,7 +174,6 @@ type MailboxStats struct {
 func (mb *Mailbox) Stats() MailboxStats {
 	return MailboxStats{
 		Enqueued: atomic.LoadUint64(&mb.enqueued),
-		Dequeued: atomic.LoadUint64(&mb.dequeued),
 		Dropped:  atomic.LoadUint64(&mb.dropped),
 		Pending:  len(mb.ch),
 	}
