@@ -214,6 +214,10 @@ stopped:
 // handleActorFailure is called when an actor panics or its OnPreStart fails.
 // If the actor was registered under a supervisor, the supervisor is notified.
 func (s *ActorSystem) handleActorFailure(e *actorEntry, reason error) {
+	// Call OnPreRestart before tearing down so the actor can clean up or
+	// save state while it is still accessible.
+	e.actor.OnPreRestart(e.ctx, reason)
+
 	// Remove the failed actor from the registry.
 	s.mu.Lock()
 	delete(s.actors, e.actor.ID())
@@ -274,15 +278,30 @@ func (s *ActorSystem) StopActor(id ActorID) error {
 // RestartActor stops the existing actor and spawns a fresh instance.
 // The actor must implement a zero-argument-like constructor; the caller
 // provides a factory function.
+//
+// Lifecycle order:
+//  1. OnPreRestart is called on the OLD instance (via handleActorFailure).
+//  2. Old actor is removed from the registry.
+//  3. New instance is spawned; OnPreStart is called.
+//  4. MsgRestarting is delivered to the new instance so it knows it is
+//     resuming after a failure rather than starting fresh.
 func (s *ActorSystem) RestartActor(factory func() Actor, opts SpawnOptions) (ActorRef, error) {
 	// The factory creates a new actor with the same ID.
 	newActor := factory()
 	id := newActor.ID()
 
-	// Stop the old one (ignore error – it may already be gone).
+	// Stop the old one (ignore error – it may already be gone after a panic).
 	_ = s.StopActor(id)
 
-	return s.Spawn(newActor, opts)
+	ref, err := s.Spawn(newActor, opts)
+	if err != nil {
+		return nil, err
+	}
+
+	// Notify the new instance that it is restarting, not starting fresh.
+	ref.Tell(newMessage(MsgRestarting, nil, ""))
+
+	return ref, nil
 }
 
 // ─────────────────────────────────────────────

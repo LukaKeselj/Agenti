@@ -82,6 +82,30 @@ func (p *Persister) Exists(id string) bool {
 	return err == nil
 }
 
+// AppendJSON appends a single JSON-encoded entry (one line) to
+// {basePath}/{id}.jsonl. The file is created automatically if it does not
+// exist. This implements the append-only log semantics required by LoggerActor
+// for per-round metrics.
+func (p *Persister) AppendJSON(id string, entry any) error {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	data, err := json.Marshal(entry)
+	if err != nil {
+		return fmt.Errorf("persister: marshal failed for %q: %w", id, err)
+	}
+	data = append(data, '\n')
+
+	path := filepath.Join(p.basePath, id+".jsonl")
+	f, err := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		return fmt.Errorf("persister: open failed for %q: %w", id, err)
+	}
+	defer f.Close()
+	_, err = f.Write(data)
+	return err
+}
+
 // Delete removes the saved state file for the given id.
 func (p *Persister) Delete(id string) error {
 	p.mu.Lock()

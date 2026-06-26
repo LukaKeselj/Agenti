@@ -97,26 +97,55 @@ func NewSensorActor(id af.ActorID, roomID string, coordinator af.ActorID, trainD
 	return s
 }
 
+// Receive is the idle behavior – the actor's default message handler.
+// State machine: Idle ──StartTraining──▶ Training ──TrainingComplete──▶ SendingResults ──Done──▶ Idle
 func (s *SensorActor) Receive(ctx af.ActorContext, msg af.Message) {
 	switch msg.MsgType {
 	case MsgStartTraining:
 		s.handleStartTraining(ctx, msg)
-	case MsgTrainingComplete:
-		s.handleTrainingComplete(ctx, msg)
 	case MsgGlobalModelUpdate:
 		s.handleGlobalModelUpdate(msg)
 	case af.MsgStatusCheck:
-		// Reply to supervisor heartbeat.
-		if ref := ctx.Sender(); ref != nil {
-			ref.Tell(af.Message{
-				MsgType: af.MsgHeartbeat,
-				Sender:  ctx.Self().ID(),
-			})
-		}
-	// Handle crash simulation for demo supervision.
+		s.handleStatusCheck(ctx)
 	case af.MessageType("crash"):
 		panic("simulated crash for demo")
 	}
+}
+
+// trainingBehavior is active while the background SGD goroutine is running.
+// It accepts MsgTrainingComplete from the goroutine and handles heartbeats;
+// a duplicate MsgStartTraining is silently dropped.
+func (s *SensorActor) trainingBehavior(ctx af.ActorContext, msg af.Message) {
+	switch msg.MsgType {
+	case MsgTrainingComplete:
+		// Training → SendingResults
+		s.mu.Lock()
+		s.state = "sending"
+		s.mu.Unlock()
+		ctx.Become(s.sendingResultsBehavior) // push SendingResults on top of Training
+		s.processSendResults(ctx, msg)
+		ctx.Unbecome() // pop SendingResults
+		ctx.Unbecome() // pop Training → Idle
+		s.mu.Lock()
+		s.state = "idle"
+		s.mu.Unlock()
+	case MsgGlobalModelUpdate:
+		s.handleGlobalModelUpdate(msg)
+	case af.MsgStatusCheck:
+		s.handleStatusCheck(ctx)
+	case MsgStartTraining:
+		s.systemLog(ctx, "already training – ignoring duplicate StartTraining")
+	case af.MessageType("crash"):
+		panic("simulated crash for demo")
+	}
+}
+
+// sendingResultsBehavior is briefly active while ModelUpdate is being sent to
+// the coordinator. Any messages that arrive in this window are queued and will
+// be dispatched once the actor returns to idle.
+func (s *SensorActor) sendingResultsBehavior(_ af.ActorContext, _ af.Message) {
+	// Window is so short that no application messages are expected here;
+	// heartbeats and GlobalModelUpdate are handled by the caller after Unbecome.
 }
 
 // ── Idle state ─────────────────────────────────────────────────
@@ -135,6 +164,8 @@ func (s *SensorActor) handleStartTraining(ctx af.ActorContext, msg af.Message) {
 
 	s.systemLog(ctx, "training started", "round", p.RoundID)
 
+	// Idle → Training: swap to trainingBehavior until results are sent.
+	ctx.Become(s.trainingBehavior)
 	go s.simulateTraining(ctx.Self(), p)
 }
 
@@ -201,20 +232,34 @@ func (s *SensorActor) stubTraining(self af.ActorRef, p StartTrainingPayload) {
 	})
 }
 
-// ── Training complete ──────────────────────────────────────────
+// ── handleStatusCheck ──────────────────────────────────────────
 
-func (s *SensorActor) handleTrainingComplete(ctx af.ActorContext, msg af.Message) {
+// handleStatusCheck replies to a supervisor heartbeat from any behavior state.
+func (s *SensorActor) handleStatusCheck(ctx af.ActorContext) {
+	if ref := ctx.Sender(); ref != nil {
+		ref.Tell(af.Message{
+			MsgType: af.MsgHeartbeat,
+			Sender:  ctx.Self().ID(),
+		})
+	}
+}
+
+// ── SendingResults ─────────────────────────────────────────────
+
+// processSendResults runs during the SendingResults behavior: it ships the
+// trained weights to the coordinator and persists local state.
+// State transitions (Become/Unbecome) are managed by trainingBehavior.
+func (s *SensorActor) processSendResults(ctx af.ActorContext, msg af.Message) {
 	p, ok := castPayload[TrainingCompletePayload](msg.Payload)
 	if !ok {
 		return
 	}
 
 	s.mu.Lock()
-	s.state = "sending"
 	s.samples = p.NumSamples
 	s.mu.Unlock()
 
-	s.systemLog(ctx, "training complete", "round", s.roundID, "loss", p.Loss)
+	s.systemLog(ctx, "training complete, sending results", "round", s.roundID, "loss", p.Loss)
 
 	// Send ModelUpdate to coordinator (remote ref takes priority).
 	coordRef := s.coordinatorRef
@@ -223,10 +268,7 @@ func (s *SensorActor) handleTrainingComplete(ctx af.ActorContext, msg af.Message
 		coordRef, err = ctx.System().Lookup(s.coordinator)
 		if err != nil {
 			s.systemLog(ctx, "coordinator not found", "id", s.coordinator)
-			s.mu.Lock()
-			s.state = "idle"
-			s.mu.Unlock()
-			return
+			return // trainingBehavior will Unbecome and reset state to idle
 		}
 	}
 
@@ -256,11 +298,8 @@ func (s *SensorActor) handleTrainingComplete(ctx af.ActorContext, msg af.Message
 		Sender: ctx.Self().ID(),
 	})
 
-	s.mu.Lock()
-	s.state = "idle"
-	s.mu.Unlock()
-
 	s.persistState()
+	// State reset to "idle" is handled by trainingBehavior after Unbecome.
 }
 
 // ── Global model update ────────────────────────────────────────

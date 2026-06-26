@@ -3,6 +3,7 @@ package actors
 import (
 	"fmt"
 	"sync"
+	"time"
 
 	af "github.com/LukaKeselj/Agenti/actor-framework"
 	"github.com/LukaKeselj/Agenti/smart-home/model"
@@ -29,6 +30,7 @@ type CoordinatorActor struct {
 	numWeights    int
 	numEpochs     int
 	learningRate  float64
+	roundStart    time.Time // set at the beginning of each FL round for ElapsedMs
 
 	loggerRef af.ActorID
 	deviceRef af.ActorID
@@ -221,6 +223,7 @@ func (c *CoordinatorActor) handleStartRound(ctx af.ActorContext) {
 	weights := copyWeights(c.globalWeights)
 	c.pendingRound = round
 	c.pendingUpdates = make(map[string]ModelUpdatePayload)
+	c.roundStart = time.Now()
 	c.mu.Unlock()
 
 	if len(sensorIDs) == 0 {
@@ -316,6 +319,7 @@ func (c *CoordinatorActor) aggregateAndFinalise(ctx af.ActorContext) {
 		avgLoss += u.Loss * ratio
 	}
 	c.globalWeights = aggregated
+	elapsed := time.Since(c.roundStart).Milliseconds()
 	c.mu.Unlock()
 
 	// Send GlobalModelUpdate to all sensors.
@@ -344,28 +348,40 @@ func (c *CoordinatorActor) aggregateAndFinalise(ctx af.ActorContext) {
 					RoundID:    round,
 					GlobalLoss: avgLoss,
 					NumClients: len(updates),
-					ElapsedMs:  100,
+					ElapsedMs:  elapsed,
 				},
 			})
 		}
 	}
 
-	// Send AdjustEnvironment based on predictions (stub).
+	// Send AdjustEnvironment using the global model to infer optimal conditions.
+	// A representative daytime-occupied reading is used as the input vector
+	// (normalised to [0,1] matching the training pipeline in data/dataset.go).
 	if c.deviceRef != "" {
 		if devRef, err := ctx.System().Lookup(c.deviceRef); err == nil {
-			temp := 22.0 + aggregated[0]*0.1
-			if temp < 18.0 {
-				temp = 18.0
-			} else if temp > 28.0 {
-				temp = 28.0
+			mlp := model.NewMLP(5, 8, 3)
+			mlp.SetWeights(aggregated)
+			// Feature vector: temp=24°C, humidity=50%, light=500lx, presence=1, hour=14
+			sampleInput := []float64{
+				(24.0 - 15) / 20,   // temp → [0,1]
+				(50.0 - 20) / 60,   // humidity → [0,1]
+				(500.0 - 50) / 950, // light → [0,1]
+				1.0,                 // presence: occupied
+				14.0 / 23,           // hour: 14:00
 			}
+			pred := mlp.Predict(sampleInput)
+			// De-normalise back to physical units (inverse of dataset.go targets).
+			targetTemp := clampF(pred[0]*10+18, 18, 28)   // [0,1] → [18, 28] °C
+			targetHum := clampF(pred[1]*40+30, 30, 70)    // [0,1] → [30, 70] %
+			targetLight := clampF(pred[2]*300+50, 50, 350) // [0,1] → [50, 350] lx
+
 			devRef.Tell(af.Message{
 				MsgType: MsgAdjustEnvironment,
 				Payload: AdjustEnvironmentPayload{
 					RoomID:      "all",
-					TargetTemp:  temp,
-					TargetHum:   50.0,
-					TargetLight: 300.0,
+					TargetTemp:  targetTemp,
+					TargetHum:   targetHum,
+					TargetLight: targetLight,
 				},
 			})
 		}
@@ -412,6 +428,16 @@ func (c *CoordinatorActor) lookupRef(ctx af.ActorContext, id string) af.ActorRef
 		return nil
 	}
 	return ref
+}
+
+func clampF(v, min, max float64) float64 {
+	if v < min {
+		return min
+	}
+	if v > max {
+		return max
+	}
+	return v
 }
 
 // StartRound triggers a new FL round (can be called from outside).

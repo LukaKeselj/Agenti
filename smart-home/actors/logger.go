@@ -106,6 +106,10 @@ func (l *LoggerActor) Receive(_ af.ActorContext, msg af.Message) {
 		l.metrics = append(l.metrics, p)
 		l.mu.Unlock()
 		l.persistState()
+		// Append-only log for metrics (JSON Lines format) as per spec §4.2.2.
+		if l.persister != nil {
+			_ = l.persister.AppendJSON(string(l.ID())+"-metrics", p)
+		}
 
 	case MsgLogEvent:
 		p, ok := castPayload[LogEventPayload](msg.Payload)

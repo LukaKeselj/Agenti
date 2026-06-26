@@ -140,7 +140,9 @@ func main() {
 		})
 
 		supervision.Register(supRef, af.ActorID(sensorID), func() af.Actor {
-			return actors.NewSensorActor(af.ActorID(sensorID), room, "coordinator", datasets[room])
+			s := actors.NewSensorActor(af.ActorID(sensorID), room, "coordinator", datasets[room])
+			s.SetPersister(pers) // restore persisted state on supervisor restart
+			return s
 		}, af.SpawnOptions{
 			SupervisorID: "supervisor",
 		})
@@ -182,15 +184,24 @@ func main() {
 			actors.StartRound(coordRef)
 		}
 
+		// Wait for round completion with a timeout so a sensor crash can't hang the demo.
 		time.Sleep(1 * time.Second)
-		for {
+		roundDeadline := time.Now().Add(15 * time.Second)
+		roundCompleted := false
+		for time.Now().Before(roundDeadline) {
 			if rd, ok := logger.LastRound(); ok && rd.RoundID == round {
+				roundCompleted = true
 				break
 			}
 			time.Sleep(200 * time.Millisecond)
 		}
+		if !roundCompleted {
+			fmt.Printf("  ⚠ Round %d did not complete within timeout (sensor may have crashed)\n\n", round)
+			continue
+		}
 
 		coordWeights := coord.Weights()
+		lastRound, _ := logger.LastRound()
 
 		// Ask EvaluatorActor for metrics.
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -216,7 +227,7 @@ func main() {
 			metrics := evaluation.Calculate(actuals, predictions)
 			results = append(results, evaluation.RoundResult{Round: round, Metrics: metrics})
 			fmt.Printf("  Loss: %.6f | MSE: %.6f | RMSE: %.6f | R²: %.6f\n\n",
-				logger.Rounds()[round-1].GlobalLoss, metrics.MSE, metrics.RMSE, metrics.R2)
+				lastRound.GlobalLoss, metrics.MSE, metrics.RMSE, metrics.R2)
 			continue
 		}
 
@@ -229,7 +240,7 @@ func main() {
 		results = append(results, evaluation.RoundResult{Round: round, Metrics: metrics})
 
 		fmt.Printf("  Loss: %.6f | MSE: %.6f | RMSE: %.6f | R²: %.6f\n\n",
-			logger.Rounds()[round-1].GlobalLoss, metrics.MSE, metrics.RMSE, metrics.R2)
+			lastRound.GlobalLoss, metrics.MSE, metrics.RMSE, metrics.R2)
 	}
 
 	// ── Convergence table ────────────────────────────────────
