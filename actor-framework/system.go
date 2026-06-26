@@ -338,9 +338,10 @@ func (s *ActorSystem) Shutdown() {
 
 // ActorFailedPayload is sent to a supervisor when an actor fails.
 type ActorFailedPayload struct {
-	ActorID   ActorID
-	ActorType string
-	Error     string
+	ActorID      ActorID
+	ActorType    string
+	Error        string
+	RestartCount int // number of times this actor has failed (tracked by supervisor)
 }
 
 

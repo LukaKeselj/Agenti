@@ -1,6 +1,10 @@
 package actors
 
-import af "github.com/LukaKeselj/Agenti/actor-framework"
+import (
+	"time"
+
+	af "github.com/LukaKeselj/Agenti/actor-framework"
+)
 
 // ── Message types ─────────────────────────────────────────────
 
@@ -69,10 +73,11 @@ type AdjustEnvironmentPayload struct {
 
 // DeviceStatusPayload is sent by DeviceControllerActor to LoggerActor.
 type DeviceStatusPayload struct {
-	RoomID      string
-	DeviceType  string
-	Action      string
-	ActorID     string
+	RoomID     string
+	DeviceType string
+	Action     string
+	ActorID    string
+	Timestamp  time.Time
 }
 
 // LogMetricsPayload is sent by any actor to LoggerActor to record metrics.

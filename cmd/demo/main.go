@@ -111,6 +111,7 @@ func main() {
 	sup := supervision.NewSupervisorActor("supervisor", supervision.SupervisionConfig{
 		Strategy:          &supervision.OneForOne{MaxRetries: cfg.Supervision.MaxRetries, Within: time.Duration(cfg.Supervision.WithinSec) * time.Second},
 		HeartbeatInterval: time.Duration(cfg.Demo.HeartbeatIntervalSec) * time.Second,
+		LoggerID:          "logger",
 	})
 	supRef := sys.MustSpawn(sup, opts)
 	fmt.Println("Supervisor spawned")

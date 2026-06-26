@@ -2,6 +2,7 @@ package supervision
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"time"
 
@@ -39,6 +40,7 @@ type DelayedRestartPayload struct {
 type SupervisionConfig struct {
 	Strategy          RestartStrategy
 	HeartbeatInterval time.Duration // 0 disables heartbeat checks
+	LoggerID          af.ActorID    // if set, supervisor sends MsgLogEvent here on restart/failure
 }
 
 // SupervisorActor monitors actors and applies restart strategies on failure.
@@ -158,6 +160,7 @@ func (s *SupervisorActor) handleFailure(ctx af.ActorContext, msg af.Message) {
 	}
 
 	failures := s.tracker.Record(payload.ActorID, 30*time.Second)
+	payload.RestartCount = len(failures)
 	decision := s.config.Strategy.OnFailure(payload.ActorID, failures)
 
 	switch decision.Action {
@@ -192,6 +195,20 @@ func (s *SupervisorActor) doRestart(_ af.ActorContext, id af.ActorID, entry fact
 	s.tracker.Reset(id)
 	s.mu.Unlock()
 	s.system.Log().Info("actor restarted", "actor_id", id, "new_ref", newRef.ID())
+
+	// Spec §4.2.1: log restart event to LoggerActor.
+	// Payload matches LogEventPayload{Source, Event} via JSON round-trip in castPayload.
+	if s.config.LoggerID != "" {
+		if logRef, lookupErr := s.system.Lookup(s.config.LoggerID); lookupErr == nil {
+			logRef.Tell(af.Message{
+				MsgType: "smart_home.log_event",
+				Payload: map[string]any{
+					"Source": fmt.Sprintf("supervisor/%s", s.ID()),
+					"Event":  fmt.Sprintf("actor %q restarted by supervisor", id),
+				},
+			})
+		}
+	}
 }
 
 func (s *SupervisorActor) doEscalate(payload af.ActorFailedPayload) {

@@ -2,6 +2,7 @@ package actors
 
 import (
 	"sync"
+	"time"
 
 	af "github.com/LukaKeselj/Agenti/actor-framework"
 	"github.com/LukaKeselj/Agenti/smart-home/persistence"
@@ -95,8 +96,8 @@ func (d *DeviceControllerActor) handleAdjustEnvironment(ctx af.ActorContext, msg
 	)
 
 	// Report each device status to logger (fire-and-forget).
+	now := time.Now()
 	for _, device := range []string{"ac", "heating", "blinds", "lights"} {
-		// Try to find the logger.
 		if logRef, err := ctx.System().Lookup("logger"); err == nil {
 			logRef.Tell(af.Message{
 				MsgType: MsgDeviceStatus,
@@ -105,6 +106,7 @@ func (d *DeviceControllerActor) handleAdjustEnvironment(ctx af.ActorContext, msg
 					DeviceType: device,
 					Action:     "adjusted",
 					ActorID:    string(ctx.Self().ID()),
+					Timestamp:  now,
 				},
 			})
 		}
